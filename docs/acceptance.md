@@ -24,5 +24,10 @@ Use a disposable local folder with spaces and Unicode characters in its name. Ke
 20. Type `exit`. Confirm the exit code is reported and that Restart brings back a working shell in the same folder.
 21. Stop the terminal with Close. Confirm the panel closes and no shell remains in Task Manager. Repeat by opening another folder while a shell runs.
 22. Close the application with a terminal running. Confirm no orphaned shell process remains.
+23. Use New project, name it, and choose a parent folder. Confirm the folder and `.tbce/project.json` are created and the project opens. Repeat with an existing name and confirm the error.
+24. Convert an already-open plain folder into a project. Edit the name, stack, architecture, branch, and commands afterwards, and confirm `project.json` on disk matches.
+25. Restart TBCE. Confirm the project appears under Recent, reopens with its manifest detected, and that a plain folder is listed without the project tag.
+26. Rename or delete a recent project's folder outside TBCE, then open it from Recent. Confirm an explanatory error appears and the entry disappears.
+27. Corrupt `project.json` with invalid JSON and then with a higher `schemaVersion`. Reopen the folder each time and confirm TBCE explains the problem instead of failing, and that project settings can repair it.
 
 Record the checks actually performed in `verification.md`; distinguish automated service tests from installed-app UI checks.

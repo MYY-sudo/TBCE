@@ -1,6 +1,7 @@
 mod commands;
 mod filesystem;
 mod process;
+mod project;
 mod terminal;
 
 use tauri::Manager;
@@ -27,6 +28,11 @@ pub fn run() {
             commands::create_entry,
             commands::rename_entry,
             commands::trash_entry,
+            commands::detect_project,
+            commands::init_project,
+            commands::update_project,
+            commands::create_project_folder,
+            commands::open_recent_project,
             commands::start_terminal,
             commands::write_terminal,
             commands::resize_terminal,

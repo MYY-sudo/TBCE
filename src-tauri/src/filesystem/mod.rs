@@ -93,26 +93,59 @@ fn check_chain(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn check_containment(root: &Path, path: &Path) -> Result<()> {
+    check_chain(root)?;
+    check_chain(path)?;
+    if !fs::canonicalize(path)?.starts_with(fs::canonicalize(root)?) {
+        return Err(ServiceError::new(
+            "INVALID_PATH",
+            "Path escapes the workspace.",
+        ));
+    }
+    Ok(())
+}
+
+// Project metadata may not exist yet. Validate the nearest existing ancestor using
+// the same containment and link checks as editor operations, without following links.
+pub(crate) fn metadata_path(root: &Path, relative: &str) -> Result<PathBuf> {
+    validate_relative(relative)?;
+    let path = root.join(relative);
+    let mut existing = path.as_path();
+    loop {
+        match fs::symlink_metadata(existing) {
+            Ok(_) => break,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound && existing != root => {
+                existing = existing
+                    .parent()
+                    .ok_or_else(|| ServiceError::new("INVALID_PATH", "Invalid parent."))?;
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    check_containment(root, existing)?;
+    Ok(path)
+}
+
+pub fn valid_name(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or("").to_ascii_uppercase();
+    !(name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.ends_with([' ', '.'])
+        || name
+            .chars()
+            .any(|c| c.is_control() || "<>:\"|?*".contains(c))
+        || ["CON", "PRN", "AUX", "NUL"].contains(&stem.as_str())
+        || ((stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.len() == 4
+            && stem.as_bytes()[3].is_ascii_digit()))
+}
+
 fn validate_relative(relative: &str) -> Result<()> {
     if relative.is_empty() {
         return Ok(());
     }
-    if relative.contains('\\')
-        || relative.split('/').any(|name| {
-            let stem = name.split('.').next().unwrap_or("").to_ascii_uppercase();
-            name.is_empty()
-                || name == "."
-                || name == ".."
-                || name.ends_with([' ', '.'])
-                || name
-                    .chars()
-                    .any(|c| c.is_control() || "<>:\"|?*".contains(c))
-                || ["CON", "PRN", "AUX", "NUL"].contains(&stem.as_str())
-                || ((stem.starts_with("COM") || stem.starts_with("LPT"))
-                    && stem.len() == 4
-                    && stem.as_bytes()[3].is_ascii_digit())
-        })
-    {
+    if relative.contains('\\') || relative.split('/').any(|name| !valid_name(name)) {
         return Err(ServiceError::new(
             "INVALID_PATH",
             "Use a relative path with valid file names inside the workspace.",
@@ -191,13 +224,7 @@ impl FileSystemService {
         } else {
             &path
         };
-        check_chain(checked)?;
-        if !fs::canonicalize(checked)?.starts_with(root) {
-            return Err(ServiceError::new(
-                "INVALID_PATH",
-                "Path escapes the workspace.",
-            ));
-        }
+        check_containment(root, checked)?;
         Ok(path)
     }
     fn non_root(&self, id: &str, relative: &str, new: bool) -> Result<PathBuf> {
@@ -497,5 +524,16 @@ mod tests {
             "LINK_NOT_ALLOWED"
         );
         assert!(service.create(&id, "link/escape", false).is_err());
+    }
+    #[test]
+    fn accepts_turkish_names_without_locale_dependent_case_folding() {
+        // Turkish case folding maps `i` to `İ` and `I` to `ı`. The reserved-name check folds ASCII
+        // only, so neither mapping can turn an ordinary name into a device name or hide one.
+        for name in ["ışık.txt", "Iğdır", "İstanbul.ts", "çğöşü.md", "CONağ.txt"] {
+            assert!(valid_name(name), "{name}");
+        }
+        for name in ["con", "CON.txt", "NUL", "lpt1.log"] {
+            assert!(!valid_name(name), "{name}");
+        }
     }
 }

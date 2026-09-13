@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 2: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, and an integrated terminal.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 3: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, and the project system.
 
 ## Available now
 
@@ -13,8 +13,16 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - Detect external edits on focus or refresh, with explicit reload/overwrite handling when saving conflicts.
 - Run a shell in the workspace directory from a resizable terminal panel, with full input, output, resizing, restart, and stop.
 - Resize or hide the explorer and use a compact dark editor interface.
+- Create a project, convert an open folder into one, and edit its name, stack, architecture, default branch, and commands.
+- Detect `.tbce/project.json` when a folder opens, and reopen earlier projects from the Recent list.
 
-Project templates, Git/GitHub integration, and the rest of V1 are not implemented in this milestone.
+Stack and architecture catalogs, Git/GitHub integration, running project commands, and the rest of V1 are not implemented in this milestone.
+
+## Projects
+
+A TBCE project is a folder containing `.tbce/project.json`. The file records a schema version, name, stack, architecture, default branch, and commands. Stack and architecture are free text until their own milestones supply catalogs. Commands are stored for later milestones; TBCE does not run them yet. A project also reports whether a `.git` entry exists at its root, without invoking Git.
+
+Opening a folder that has no manifest still works exactly as before. Use the project button in the explorer to convert it, or to edit an existing project's settings. Recent projects are remembered locally; an entry that no longer opens is reported and removed.
 
 ## Development
 
@@ -60,7 +68,7 @@ Click the workspace name in the explorer to select the root before creating a ro
 
 One workspace per window, explicit saves, and no session restoration or crash recovery. Supported files are UTF-8, optionally with BOM, up to 10 MiB, using LF or CRLF. Binary files, other encodings, mixed/legacy line endings, symlinks, and junctions are rejected with an explanation. Monaco language features are bundled locally; no CDN or account is required.
 
-One terminal at a time, running the operating system's default shell. Multiple terminal tabs, terminal names, command history, and choosing a shell arrive in later milestones. Closing a terminal ends its session and its scrollback. Closing the window stops every shell.
+One terminal at a time, running the operating system's default shell. Multiple terminal tabs, terminal names, command history, and choosing a shell arrive in later milestones. On Windows the session is started in UTF-8 so that tool output and non-ASCII file names survive; `cmd.exe` and PowerShell are recognized, and any other shell keeps the code page it starts with. Closing a terminal ends its session and its scrollback. Closing the window stops every shell.
 
 Filesystem access is confined to the selected workspace by Rust validation. Destructive operations cannot target its root. The terminal starts in the workspace root and the webview cannot choose a program or directory, but commands the user types run with the application's privileges: the shell is not a sandbox. See the architecture notes for the local-process race limitation before building untrusted automation on these services.
 

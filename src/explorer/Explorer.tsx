@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -8,10 +9,14 @@ import {
   FolderPlus,
   Pencil,
   RefreshCw,
+  Settings2,
   Trash2,
   Ban,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
+import { useProject } from '../stores/project';
+import { ProjectSettingsDialog } from '../projects/ProjectSettingsDialog';
+import { emptyFields, fieldsOf } from '../types/project';
 import type { FileEntry } from '../types/workspace';
 function Tree({ path, depth }: { path: string; depth: number }) {
   const entries = useWorkspace((s) => s.tree[path]);
@@ -80,18 +85,39 @@ export function Explorer() {
   const busy = useWorkspace((s) => s.busy);
   const selected = useWorkspace((s) => s.selected);
   const empty = useWorkspace((s) => s.tree['']?.length === 0);
+  const detection = useProject((s) => s.detection);
+  const projectBusy = useProject((s) => s.busy);
+  const [editing, setEditing] = useState(false);
+  const project = detection.status === 'found' ? detection : null;
+  // An unreadable manifest still exists on disk, so editing it repairs rather than converts.
+  const mode = detection.status === 'none' ? 'convert' : 'settings';
   return (
     <aside className="explorer">
       <div className="panel-heading">
         <span>EXPLORER</span>
-        <span className="panel-tag">FILES</span>
+        <span className="panel-tag">{project ? 'PROJECT' : 'FILES'}</span>
       </div>
       {workspace ? (
         <>
           <div className="workspace-root">
             <button onClick={() => actions.select(null)} title={workspace.path}>
               <ChevronDown size={13} />
-              <span>{workspace.name}</span>
+              <span>{project ? project.manifest.name : workspace.name}</span>
+            </button>
+            <button
+              className="icon-button"
+              title={
+                mode === 'settings'
+                  ? 'Project settings'
+                  : 'Convert this folder into a TBCE project'
+              }
+              aria-label={
+                mode === 'settings' ? 'Project settings' : 'Convert to project'
+              }
+              disabled={busy || projectBusy}
+              onClick={() => setEditing(true)}
+            >
+              <Settings2 size={14} />
             </button>
             <button
               className="icon-button"
@@ -103,6 +129,28 @@ export function Explorer() {
               <RefreshCw size={14} />
             </button>
           </div>
+          {project && (project.manifest.stack || project.hasGit) && (
+            <div className="project-facts">
+              {project.manifest.stack && <span>{project.manifest.stack}</span>}
+              {project.hasGit && <span>Git repository</span>}
+            </div>
+          )}
+          {detection.status === 'invalid' && (
+            <p className="project-warning" role="status">
+              {detection.message}
+            </p>
+          )}
+          {editing && (
+            <ProjectSettingsDialog
+              mode={mode}
+              initial={
+                project
+                  ? fieldsOf(project.manifest)
+                  : emptyFields(workspace.name)
+              }
+              onClose={() => setEditing(false)}
+            />
+          )}
           <div className="explorer-tools">
             <button
               title="New file"

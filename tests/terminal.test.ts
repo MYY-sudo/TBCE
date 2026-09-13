@@ -123,3 +123,81 @@ test('a failed start reports the error and leaves no session', async () => {
   expect(useTerminal.getState().error).toContain('desktop app');
   expect(useTerminal.getState().session).toBeNull();
 });
+
+test('workspace changes retire a shell whose start has not returned yet', async () => {
+  let finish!: (value: ReturnType<typeof session>) => void;
+  vi.mocked(terminal.start).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const starting = actions.start();
+  await vi.waitFor(() => expect(terminal.start).toHaveBeenCalled());
+  useWorkspace.setState({
+    workspace: { id: '2', name: 'other', path: 'C:/other' },
+  });
+  finish(session('late'));
+  await starting;
+  await vi.waitFor(() => expect(useTerminal.getState().busy).toBe(false));
+  expect(terminal.stop).toHaveBeenCalledWith('late');
+  expect(useTerminal.getState().session).toBeNull();
+});
+
+test('workspace changes during restart clean up the replacement session', async () => {
+  await actions.start();
+  let finish!: (value: ReturnType<typeof session>) => void;
+  vi.mocked(terminal.restart).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const restarting = actions.restart();
+  await vi.waitFor(() => expect(terminal.restart).toHaveBeenCalled());
+  useWorkspace.setState({ workspace: null });
+  finish(session('late-restart'));
+  await restarting;
+  await vi.waitFor(() => expect(useTerminal.getState().busy).toBe(false));
+  expect(terminal.stop).toHaveBeenCalledWith('late-restart');
+  expect(useTerminal.getState().session).toBeNull();
+});
+
+test('startup output and exits are buffered by session and stale output is discarded', async () => {
+  const received: string[] = [];
+  const detach = actions.attach((data) => received.push(data));
+  vi.mocked(terminal.start).mockImplementation(async () => {
+    emit({ kind: 'output', id: 'old', data: 'stale' });
+    emit({ kind: 'output', id: 't1', data: '\x1b[6n' });
+    emit({ kind: 'exit', id: 't1', code: 4 });
+    return session('t1');
+  });
+  await actions.start();
+  emit({ kind: 'output', id: 'old', data: 'also stale' });
+  expect(received).toEqual(['\x1b[6n']);
+  expect(useTerminal.getState()).toMatchObject({
+    status: 'exited',
+    exitCode: 4,
+  });
+  detach();
+});
+
+test('failed cleanup is retried before starting another shell', async () => {
+  await actions.start();
+  vi.mocked(terminal.stop).mockRejectedValueOnce({
+    code: 'STOP_FAILED',
+    message: 'Still running',
+  });
+  await actions.close();
+  expect(useTerminal.getState().error).toBe('Still running');
+  await actions.start();
+  expect(terminal.stop).toHaveBeenCalledTimes(2);
+  expect(useTerminal.getState().session?.id).toBe('t1');
+});
+
+test('a view remount receives early output after hiding during startup', async () => {
+  await actions.start();
+  emit({ kind: 'output', id: 't1', data: '\x1b[6n' });
+  const received = vi.fn();
+  const detach = actions.attach(received);
+  expect(received).toHaveBeenCalledWith('\x1b[6n');
+  detach();
+});

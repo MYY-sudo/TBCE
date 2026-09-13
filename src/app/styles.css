@@ -474,6 +474,114 @@ button.primary:hover:not(:disabled) {
   min-width: 185px;
   justify-content: space-between;
 }
+.welcome-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.welcome-actions > button:not(.primary) {
+  border: 1px solid #424952;
+  padding: 11px 15px;
+  color: #b6bfcb;
+}
+.recent {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.recent-row {
+  display: flex;
+  align-items: center;
+}
+.recent-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+.recent-row > button:first-child > span:first-child {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-tag {
+  flex-shrink: 0;
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #8f9d8a;
+  border: 1px solid #46503e;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+.recent-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  direction: rtl;
+  color: #5e6773;
+  font-size: 11px;
+}
+.project-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 9px;
+  border-bottom: 1px solid #2b3037;
+}
+.project-facts span {
+  font-size: 9px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #8f9d8a;
+  border: 1px solid #46503e;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.project-warning {
+  margin: 0;
+  padding: 9px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #e2c49b;
+  background: #2a2620;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+  margin-top: 17px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.field span {
+  font-size: 11px;
+  color: #8d96a3;
+}
+.field-legend {
+  display: block;
+  margin-top: 22px;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  font-weight: 600;
+  color: #6f7987;
+}
+.field-note {
+  font-size: 11px;
+  margin-bottom: 0;
+}
 .welcome-rule {
   height: 1px;
   background: #30363d;

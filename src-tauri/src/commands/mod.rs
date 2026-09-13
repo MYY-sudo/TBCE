@@ -1,5 +1,9 @@
-use crate::filesystem::{Document, Entry, FileSystemService, Result, ServiceError, Workspace};
+use crate::filesystem::{
+    valid_name, Document, Entry, FileSystemService, Result, ServiceError, Workspace,
+};
+use crate::project::{Project, ProjectDetection, ProjectFields, ProjectService};
 use crate::terminal::{Terminal, TerminalEvent, TerminalService};
+use std::path::Path;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
@@ -132,6 +136,66 @@ pub async fn trash_entry(
         lock(&state)?.trash(&workspace_id, &path)?;
     }
     Ok(confirmed)
+}
+#[tauri::command]
+pub async fn detect_project(
+    state: State<'_, Backend>,
+    workspace_id: String,
+) -> Result<ProjectDetection> {
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    ProjectService::detect(&root)
+}
+#[tauri::command]
+pub async fn init_project(
+    state: State<'_, Backend>,
+    workspace_id: String,
+    fields: ProjectFields,
+) -> Result<Project> {
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    ProjectService::init(&root, fields)
+}
+#[tauri::command]
+pub async fn update_project(
+    state: State<'_, Backend>,
+    workspace_id: String,
+    fields: ProjectFields,
+) -> Result<Project> {
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    ProjectService::update(&root, fields)
+}
+#[tauri::command]
+pub async fn create_project_folder(
+    app: AppHandle,
+    state: State<'_, Backend>,
+    name: String,
+) -> Result<Option<Workspace>> {
+    if name.contains('/') || name.contains('\\') || !valid_name(&name) {
+        return Err(ServiceError::new(
+            "INVALID_NAME",
+            "Enter a folder name, not a path.",
+        ));
+    }
+    let parent =
+        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
+            .await
+            .map_err(|e| ServiceError::new("DIALOG_ERROR", e.to_string()))?;
+    match parent {
+        Some(parent) => {
+            let path = parent
+                .into_path()
+                .map_err(|e| ServiceError::new("INVALID_PATH", e.to_string()))?
+                .join(&name);
+            std::fs::create_dir(&path)?;
+            Ok(Some(lock(&state)?.open(&path)?))
+        }
+        None => Ok(None),
+    }
+}
+#[tauri::command]
+pub async fn open_recent_project(state: State<'_, Backend>, path: String) -> Result<Workspace> {
+    // Recent entries come from folders this application already opened, and opening one still
+    // canonicalizes and checks the path exactly like the native picker path does.
+    lock(&state)?.open(Path::new(&path))
 }
 #[tauri::command]
 pub async fn start_terminal(

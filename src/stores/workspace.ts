@@ -81,6 +81,10 @@ async function refreshTree() {
   }
   set({ tree, expanded: get().expanded.filter((path) => path in tree) });
 }
+async function adopt(workspace: Workspace, status: string) {
+  set({ ...initial, workspace, busy: true, status });
+  await loadDirectory('');
+}
 async function openPath(path: string) {
   const existing = get().tabs.find(
     (t) => t.path.toLowerCase() === path.toLowerCase(),
@@ -184,10 +188,10 @@ export const actions = {
     perform(async () => {
       if (!(await confirmDirty(get().tabs))) return;
       const workspace = await fileSystem.chooseWorkspace();
-      if (!workspace) return;
-      set({ ...initial, workspace, busy: true, status: 'Workspace opened' });
-      await loadDirectory('');
+      if (workspace) await adopt(workspace, 'Workspace opened');
     }),
+  setWorkspace: (workspace: Workspace, status: string) =>
+    perform(() => adopt(workspace, status)),
   openFile: (path?: string) =>
     perform(async () => {
       if (!get().workspace) return;

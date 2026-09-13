@@ -5,6 +5,7 @@ import {
   Code2,
   Files,
   FolderOpen,
+  FolderPlus,
   PanelLeft,
   Save,
   SquareTerminal,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { actions as terminalActions, useTerminal } from '../stores/terminal';
+import { actions as projectActions, useProject } from '../stores/project';
 import { useDialog } from '../stores/dialog';
 import { Dialog } from '../components/Dialog';
 import { Explorer } from '../explorer/Explorer';
@@ -25,6 +27,9 @@ export function App() {
   const state = useWorkspace();
   const terminalVisible = useTerminal((s) => s.visible);
   const terminalSession = useTerminal((s) => s.session);
+  const recent = useProject((s) => s.recent);
+  const projectBusy = useProject((s) => s.busy);
+  const projectError = useProject((s) => s.error);
   const [sidebar, setSidebar] = useState(true);
   const [width, setWidth] = useState(252);
   const [dock, setDock] = useState(248);
@@ -205,11 +210,17 @@ export function App() {
               {state.tabs.length ? `${state.tabs.length} open` : 'TBCE'}
             </span>
           </div>
-          {state.error && (
+          {(state.error || projectError) && (
             <div className="error-banner" role="alert">
               <AlertTriangle size={15} />
-              <span>{state.error}</span>
-              <button aria-label="Dismiss error" onClick={actions.dismissError}>
+              <span>{state.error ?? projectError}</span>
+              <button
+                aria-label="Dismiss error"
+                onClick={() => {
+                  actions.dismissError();
+                  projectActions.dismissError();
+                }}
+              >
                 <X size={15} />
               </button>
             </div>
@@ -260,15 +271,57 @@ export function App() {
                   <br />
                   Everything starts with a workspace.
                 </p>
-                <button
-                  className="primary open-workspace"
-                  disabled={state.busy}
-                  onClick={() => void actions.openWorkspace()}
-                >
-                  <FolderOpen size={17} />
-                  Open a folder
-                  <ArrowUpRight size={16} />
-                </button>
+                <div className="welcome-actions">
+                  <button
+                    className="primary open-workspace"
+                    disabled={state.busy || projectBusy}
+                    onClick={() => void actions.openWorkspace()}
+                  >
+                    <FolderOpen size={17} />
+                    Open a folder
+                    <ArrowUpRight size={16} />
+                  </button>
+                  <button
+                    disabled={state.busy || projectBusy}
+                    onClick={() => void projectActions.createProject()}
+                  >
+                    <FolderPlus size={16} />
+                    New project
+                  </button>
+                </div>
+                {recent.length > 0 && (
+                  <div className="recent">
+                    <span className="field-legend">RECENT</span>
+                    {recent.map((entry) => (
+                      <div className="recent-row" key={entry.path}>
+                        <button
+                          title={entry.path}
+                          disabled={state.busy || projectBusy}
+                          onClick={() =>
+                            void projectActions.openRecent(entry.path)
+                          }
+                        >
+                          <span>{entry.name}</span>
+                          {entry.isProject && (
+                            <span className="recent-tag">
+                              {entry.stack || 'PROJECT'}
+                            </span>
+                          )}
+                          <span className="recent-path">{entry.path}</span>
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label={`Remove ${entry.name} from recent projects`}
+                          onClick={() =>
+                            projectActions.forgetRecent(entry.path)
+                          }
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="welcome-rule" />
                 <div className="shortcuts">
                   <div>
