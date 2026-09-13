@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Local editor window permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:event:default",
+    "core:window:allow-destroy",
+    "allow-choose-workspace",
+    "allow-choose-file",
+    "allow-list-directory",
+    "allow-read-file",
+    "allow-write-file",
+    "allow-create-entry",
+    "allow-rename-entry",
+    "allow-trash-entry"
+  ]
+}

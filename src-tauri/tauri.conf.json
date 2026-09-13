@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TBCE",
+  "version": "0.1.0",
+  "identifier": "com.tbce.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "TBCE",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 800,
+        "minHeight": 540
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src ipc: http://ipc.localhost; worker-src 'self' blob:",
+      "capabilities": ["main"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "shortDescription": "Everything your project needs, in one place.",
+    "windows": { "nsis": { "installMode": "currentUser" } }
+  }
+}
