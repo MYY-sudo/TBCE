@@ -16,5 +16,13 @@ Use a disposable local folder with spaces and Unicode characters in its name. Ke
 12. Attempt to open a binary file, UTF-16 file, mixed-line-ending file, and file larger than 10 MiB. Verify actionable errors. Try invalid names and collisions; existing contents must survive.
 13. Check resize, keyboard focus, dialog Escape, explorer visibility, and status information at the minimum window size.
 14. Verify bundled Monaco language workers load without CDN requests. Inspect TypeScript/JSON language features in the packaged application.
+15. Open the terminal with the activity-bar button and with Ctrl+`. Confirm the shell prompt appears and that the button is disabled before a folder is open.
+16. Run `cd` and confirm the shell started in the workspace folder. Run a command that prints Turkish characters and confirm they are not mangled.
+17. Run an interactive command, cancel it with Ctrl+C, and confirm the shell survives. Confirm colored output renders.
+18. Drag the terminal divider and resize the window. Confirm long output rewraps to the new width rather than staying at the old one.
+19. Hide the terminal, run a command that keeps printing, reopen it, and confirm the output continued and scrollback survived.
+20. Type `exit`. Confirm the exit code is reported and that Restart brings back a working shell in the same folder.
+21. Stop the terminal with Close. Confirm the panel closes and no shell remains in Task Manager. Repeat by opening another folder while a shell runs.
+22. Close the application with a terminal running. Confirm no orphaned shell process remains.
 
 Record the checks actually performed in `verification.md`; distinguish automated service tests from installed-app UI checks.

@@ -13,6 +13,11 @@
     "allow-write-file",
     "allow-create-entry",
     "allow-rename-entry",
-    "allow-trash-entry"
+    "allow-trash-entry",
+    "allow-start-terminal",
+    "allow-write-terminal",
+    "allow-resize-terminal",
+    "allow-stop-terminal",
+    "allow-restart-terminal"
   ]
 }

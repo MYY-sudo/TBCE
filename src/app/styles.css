@@ -140,17 +140,17 @@ input:focus-visible,
   border-left: 2px solid #adc99b;
   color: #adc99b;
 }
-.activity-bottom {
+.activity-bar button.activity-bottom {
   margin-top: auto;
-  margin-bottom: 18px;
-  width: 24px;
-  height: 24px;
+  margin-bottom: 14px;
   border: 1px solid #3a414b;
-  display: grid;
-  place-items: center;
   border-radius: 7px;
+  padding: 6px;
   color: #89929f;
-  font-size: 11px;
+}
+.activity-bar button.activity-bottom[aria-pressed='true'] {
+  border-color: #5d6f51;
+  color: #adc99b;
 }
 .explorer {
   height: 100%;
@@ -355,6 +355,53 @@ input:focus-visible,
 .monaco-host {
   flex: 1;
   min-height: 0;
+}
+.terminal-dock {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+  background: #16191e;
+}
+.terminal-dock[hidden] {
+  display: none;
+}
+.dock-handle {
+  height: 3px;
+  flex-shrink: 0;
+  cursor: row-resize;
+  background: #2b3037;
+}
+.dock-handle:hover {
+  background: #aecb9d;
+}
+.terminal-heading {
+  height: 37px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 9px 0 15px;
+  border-bottom: 1px solid #23272e;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.2px;
+  color: #a7aeb8;
+}
+.terminal-heading svg {
+  color: #8d96a3;
+}
+.terminal-heading button {
+  color: #8d96a3;
+}
+.terminal-spacer {
+  flex: 1;
+}
+.terminal-host {
+  flex: 1;
+  min-height: 0;
+  padding: 7px 4px 7px 14px;
+  overflow: hidden;
 }
 .welcome {
   flex: 1;

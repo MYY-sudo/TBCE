@@ -9,6 +9,11 @@ fn main() {
             "create_entry",
             "rename_entry",
             "trash_entry",
+            "start_terminal",
+            "write_terminal",
+            "resize_terminal",
+            "stop_terminal",
+            "restart_terminal",
         ]),
     ))
     .expect("could not build TBCE capabilities");

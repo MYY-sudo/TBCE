@@ -1,13 +1,25 @@
 use crate::filesystem::{Document, Entry, FileSystemService, Result, ServiceError, Workspace};
+use crate::terminal::{Terminal, TerminalEvent, TerminalService};
 use std::sync::Mutex;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
 pub type Backend = Mutex<FileSystemService>;
+pub type Terminals = Mutex<TerminalService>;
 fn lock(state: &Backend) -> Result<std::sync::MutexGuard<'_, FileSystemService>> {
     state
         .lock()
         .map_err(|_| ServiceError::new("INTERNAL", "Workspace service is unavailable."))
+}
+fn lock_terminals(state: &Terminals) -> Result<std::sync::MutexGuard<'_, TerminalService>> {
+    state
+        .lock()
+        .map_err(|_| ServiceError::new("INTERNAL", "Terminal service is unavailable."))
+}
+fn emitter(app: AppHandle) -> impl Fn(TerminalEvent) + Clone + Send + 'static {
+    move |event| {
+        let _ = app.emit("terminal:event", event);
+    }
 }
 
 #[tauri::command]
@@ -120,4 +132,47 @@ pub async fn trash_entry(
         lock(&state)?.trash(&workspace_id, &path)?;
     }
     Ok(confirmed)
+}
+#[tauri::command]
+pub async fn start_terminal(
+    app: AppHandle,
+    state: State<'_, Backend>,
+    terminals: State<'_, Terminals>,
+    workspace_id: String,
+) -> Result<Terminal> {
+    // The working directory comes from the open workspace, never from a path supplied by the webview.
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    lock_terminals(&terminals)?.start(&root, emitter(app))
+}
+#[tauri::command]
+pub async fn write_terminal(
+    terminals: State<'_, Terminals>,
+    id: String,
+    data: String,
+) -> Result<()> {
+    lock_terminals(&terminals)?.write(&id, &data)
+}
+#[tauri::command]
+pub async fn resize_terminal(
+    terminals: State<'_, Terminals>,
+    id: String,
+    cols: u16,
+    rows: u16,
+) -> Result<()> {
+    lock_terminals(&terminals)?.resize(&id, cols, rows)
+}
+#[tauri::command]
+pub async fn stop_terminal(terminals: State<'_, Terminals>, id: String) -> Result<()> {
+    lock_terminals(&terminals)?.stop(&id)
+}
+#[tauri::command]
+pub async fn restart_terminal(
+    app: AppHandle,
+    state: State<'_, Backend>,
+    terminals: State<'_, Terminals>,
+    workspace_id: String,
+    id: String,
+) -> Result<Terminal> {
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    lock_terminals(&terminals)?.restart(&id, &root, emitter(app))
 }

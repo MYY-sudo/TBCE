@@ -1,5 +1,13 @@
 # Remaining work
 
+## Within the terminal
+
+- Support multiple terminal tabs, terminal names, and command history. The roadmap defers these; the backend already tracks sessions by identifier, so the panel is the part that needs work.
+- Make the shell configurable. The default shell comes from the operating system until the settings milestone adds a choice.
+- Test macOS and Linux. Only Windows and ConPTY have been exercised.
+- Evaluate throttling very fast output. Reads are already batched into 8 KiB chunks, and no interactive throttling is applied on top of that.
+- Consider restoring terminal scrollback across panel closes. Closing a terminal ends its session and its buffer.
+
 ## Within the editor
 
 - Test macOS and Linux, including platform-specific filesystem semantics and shortcuts.
@@ -14,6 +22,6 @@
 
 See the [full product vision and V1/V2 roadmap](roadmap.md) for every milestone, completion criteria, and security requirement.
 
-Next: Milestone 2, integrated terminal backed by reusable Rust ProcessService and TerminalService. Then implement the project system, stacks, architectures, local Git and Git UI, GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order.
+Next: Milestone 3, the project system with a `ProjectService` and versioned `.tbce/project.json`. Then implement stacks, architectures, local Git and Git UI, GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
 
 The current implementation does not claim V1 completion. Advanced automation remains outside the foundation/editor scope.

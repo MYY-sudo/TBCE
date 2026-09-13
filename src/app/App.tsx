@@ -7,21 +7,27 @@ import {
   FolderOpen,
   PanelLeft,
   Save,
+  SquareTerminal,
   X,
   Circle,
   AlertTriangle,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
+import { actions as terminalActions, useTerminal } from '../stores/terminal';
 import { useDialog } from '../stores/dialog';
 import { Dialog } from '../components/Dialog';
 import { Explorer } from '../explorer/Explorer';
 import { fileName, isDirty } from '../types/workspace';
 import { guardWindowClose } from '../services/window';
 const Editor = lazy(() => import('../editor/Editor'));
+const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 export function App() {
   const state = useWorkspace();
+  const terminalVisible = useTerminal((s) => s.visible);
+  const terminalSession = useTerminal((s) => s.session);
   const [sidebar, setSidebar] = useState(true);
   const [width, setWidth] = useState(252);
+  const [dock, setDock] = useState(248);
   const active = state.tabs.find((t) => t.id === state.activeId);
   useEffect(() => {
     let disposed = false;
@@ -35,12 +41,13 @@ export function App() {
     const keydown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || useDialog.getState().request) return;
       const key = e.key.toLowerCase();
-      if (['s', 'w', 'o'].includes(key)) e.preventDefault();
+      if (['s', 'w', 'o', '`'].includes(key)) e.preventDefault();
       else return;
       if (key === 's') void (e.shiftKey ? actions.saveAll() : actions.save());
       if (key === 'w' && useWorkspace.getState().activeId)
         void actions.close(useWorkspace.getState().activeId!);
       if (key === 'o') void actions.openFile();
+      if (key === '`') terminalActions.toggle();
     };
     const focus = () => {
       void actions.checkExternal();
@@ -120,7 +127,16 @@ export function App() {
           >
             <Files size={21} />
           </button>
-          <span className="activity-bottom">T</span>
+          <button
+            className="activity-bottom"
+            title="Toggle terminal (Ctrl+`)"
+            aria-label="Toggle terminal"
+            aria-pressed={terminalVisible}
+            disabled={!state.workspace}
+            onClick={terminalActions.toggle}
+          >
+            <SquareTerminal size={18} />
+          </button>
         </nav>
         {sidebar && (
           <>
@@ -267,6 +283,10 @@ export function App() {
                     <span>Close tab</span>
                     <kbd>Ctrl W</kbd>
                   </div>
+                  <div>
+                    <span>Toggle terminal</span>
+                    <kbd>Ctrl `</kbd>
+                  </div>
                 </div>
                 <div className="welcome-note">
                   <span className="small-square" />
@@ -276,6 +296,45 @@ export function App() {
               <span className="welcome-version">
                 TOOLS, BRANCHES, CODE, EVERYTHING<span>FOUNDATION / 0.1</span>
               </span>
+            </div>
+          )}
+          {(terminalVisible || terminalSession) && (
+            <div
+              className="terminal-dock"
+              hidden={!terminalVisible}
+              style={{ height: dock }}
+            >
+              <div
+                role="separator"
+                aria-label="Resize terminal"
+                aria-orientation="horizontal"
+                aria-valuenow={dock}
+                tabIndex={0}
+                className="dock-handle"
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowUp')
+                    setDock((h) => Math.min(620, h + 16));
+                  if (e.key === 'ArrowDown')
+                    setDock((h) => Math.max(120, h - 16));
+                }}
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId))
+                    setDock(
+                      Math.max(
+                        120,
+                        Math.min(620, window.innerHeight - e.clientY - 25),
+                      ),
+                    );
+                }}
+              />
+              <Suspense
+                fallback={<div className="loading">Loading terminal…</div>}
+              >
+                <TerminalPanel />
+              </Suspense>
             </div>
           )}
         </main>

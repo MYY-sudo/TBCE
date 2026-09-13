@@ -1,6 +1,6 @@
 # Architecture
 
-TBCE 0.1 implements the desktop foundation and local editor. No terminal, shell execution, repository integration, database, or project-template behavior is exposed yet.
+TBCE 0.1 implements the desktop foundation, the local editor, and the integrated terminal. No repository integration, database, or project-template behavior is exposed yet.
 
 ## Boundaries
 
@@ -11,6 +11,15 @@ React components
   → Tauri commands
   → Rust FileSystemService
   → operating system
+```
+
+```text
+xterm.js view
+  → terminal store actions
+  → typed TerminalService adapter
+  → Tauri commands
+  → Rust TerminalService → ProcessService
+  → pseudo terminal → shell process
 ```
 
 The Rust service owns the selected root and a generation identifier. The frontend receives a display path and identifier, then supplies only relative paths for filesystem operations. Replacing the workspace invalidates the previous identifier. Native pickers choose folders and files; opening an arbitrary absolute path is not exposed to the webview.
@@ -29,6 +38,23 @@ Commands return serializable values or `{ code, message }` errors. The service a
 | `create_entry`     | `workspaceId`, `path`, `directory`                  | Void                                    |
 | `rename_entry`     | `workspaceId`, `from`, `to`                         | Void                                    |
 | `trash_entry`      | `workspaceId`, `path`; native confirmation          | Whether deletion was confirmed          |
+| `start_terminal`   | `workspaceId`                                       | Terminal identifier and shell name      |
+| `restart_terminal` | `workspaceId`, `id`                                 | Terminal identifier and shell name      |
+| `write_terminal`   | `id`, `data`                                        | Void                                    |
+| `resize_terminal`  | `id`, `cols`, `rows`                                | Void                                    |
+| `stop_terminal`    | `id`                                                | Void                                    |
+
+Terminal output and exit codes arrive on the `terminal:event` channel as `{ kind: "output", id, data }` or `{ kind: "exit", id, code }`. The frontend subscribes before starting a shell and ignores exit reports from a replaced session.
+
+## Terminal behavior
+
+`ProcessService` owns pseudo-terminal processes: it spawns them, streams decoded output, forwards input, resizes, and terminates. `TerminalService` keeps shell sessions on top of it, keyed by identifiers it generates. Project commands and any future automation are expected to reuse `ProcessService` rather than executing shells themselves.
+
+The shell directory comes from the open workspace identifier, so the webview cannot choose where a shell runs. The default shell is `%COMSPEC%` on Windows and `$SHELL` elsewhere; choosing one belongs to the settings milestone.
+
+Output is decoded as UTF-8 across read boundaries, so multi-byte characters split between reads survive. ConPTY asks the terminal for its cursor position and refuses to start the child until it is answered, so the frontend attaches its event listener before requesting a shell; xterm.js produces that answer on its own. ConPTY also keeps the output pipe open while the session lives, so exits are detected by waiting on the process instead of by end of output, after a short window that lets trailing output through. Windows reports a successful termination as an error, so stopping confirms that the process actually ended.
+
+Closing the window terminates every session. Replacing the workspace stops the running shell because its directory belonged to the previous workspace.
 
 ## Editing and failure behavior
 
@@ -41,7 +67,9 @@ Commands return serializable values or `{ code, message }` errors. The service a
 
 ## Security boundary
 
-Only the local main window receives the explicitly enumerated application commands and event/close permissions. No shell, generic filesystem plugin permission, remote origin, or credential storage is exposed. Monaco workers, fonts, and application assets are bundled locally.
+Only the local main window receives the explicitly enumerated application commands and event/close permissions. No shell plugin, generic filesystem plugin permission, remote origin, or credential storage is exposed. Monaco workers, fonts, and application assets are bundled locally.
+
+Shell execution is privileged. The webview cannot name a program, arguments, or directory: the terminal commands accept a workspace identifier and start the operating system's default shell in that workspace root. Whatever the user then types runs with the application's own privileges, exactly as it would in any terminal, so the shell is not a sandbox and must not be treated as one.
 
 The backend rejects absolute paths, traversal components, Windows alternate data streams, invalid names, reserved device names, symlinks, and junctions. Existing targets and destination parents are checked against the canonical root. Renaming or deleting the root is forbidden. Creation and rename reject collisions; deletion uses the Recycle Bin and requires native confirmation.
 
@@ -49,4 +77,4 @@ These checks protect ordinary local editing. They do not provide an OS-level san
 
 ## Future services
 
-Add ProjectService with versioned `.tbce/project.json` in Milestone 3. Add ProcessService and TerminalService when implementing the terminal. SQLite should arrive with an actual persistence requirement. GitService, GitHubService, TemplateService, and ArchitectureService remain independent future services; UI components must continue to call service APIs.
+Add ProjectService with versioned `.tbce/project.json` in Milestone 3. SQLite should arrive with an actual persistence requirement. GitService, GitHubService, TemplateService, and ArchitectureService remain independent future services; UI components must continue to call service APIs.
