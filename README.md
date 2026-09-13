@@ -62,6 +62,7 @@ Filesystem access is confined to the selected workspace by Rust validation. Dest
 
 ## Documentation
 
+- [Full product vision and V1/V2 roadmap](docs/roadmap.md)
 - [Architecture and native interfaces](docs/architecture.md)
 - [Windows acceptance checklist](docs/acceptance.md)
 - [Verification results](docs/verification.md)

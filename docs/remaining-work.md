@@ -12,6 +12,8 @@
 
 ## Product roadmap
 
+See the [full product vision and V1/V2 roadmap](roadmap.md) for every milestone, completion criteria, and security requirement.
+
 Next: Milestone 2, integrated terminal backed by reusable Rust ProcessService and TerminalService. Then implement the project system, stacks, architectures, local Git and Git UI, GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order.
 
 The current implementation does not claim V1 completion. Advanced automation remains outside the foundation/editor scope.
