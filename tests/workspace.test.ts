@@ -42,6 +42,33 @@ async function edit(path = 'a.ts') {
   await actions.openFile(path);
   actions.edit(useWorkspace.getState().activeId!, 'edited');
 }
+
+test('snapshot can save all edits or use disk without discarding buffers', async () => {
+  await edit();
+  const capture = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(ask).mockResolvedValue('disk');
+  expect(await actions.snapshot(capture)).toBe(true);
+  expect(fileSystem.write).not.toHaveBeenCalled();
+  expect(isDirty(useWorkspace.getState().tabs[0])).toBe(true);
+  vi.mocked(ask).mockResolvedValue('save');
+  expect(await actions.snapshot(capture)).toBe(true);
+  expect(fileSystem.write).toHaveBeenCalledTimes(1);
+  expect(isDirty(useWorkspace.getState().tabs[0])).toBe(false);
+});
+test('snapshot cancellation, failed saves and cancelled conflicts prevent capture', async () => {
+  await edit();
+  const capture = vi.fn();
+  vi.mocked(ask).mockResolvedValue('cancel');
+  expect(await actions.snapshot(capture)).toBe(false);
+  vi.mocked(ask).mockResolvedValue('save');
+  vi.mocked(fileSystem.write).mockRejectedValue({ message: 'Read only' });
+  expect(await actions.snapshot(capture)).toBe(false);
+  vi.mocked(fileSystem.write).mockRejectedValue({ code: 'CONFLICT' });
+  vi.mocked(ask).mockResolvedValueOnce('save').mockResolvedValueOnce('cancel');
+  expect(await actions.snapshot(capture)).toBe(false);
+  expect(capture).not.toHaveBeenCalled();
+  expect(isDirty(useWorkspace.getState().tabs[0])).toBe(true);
+});
 test('opening a file twice activates its existing tab and retains edits', async () => {
   await edit();
   await actions.openFile('b.ts');

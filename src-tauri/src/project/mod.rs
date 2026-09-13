@@ -26,7 +26,7 @@ pub struct ProjectManifest {
     #[serde(default)]
     pub commands: ProjectCommands,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectFields {
     pub name: String,

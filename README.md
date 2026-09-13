@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 3: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, and the project system.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 4: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, and personal saved stacks. Desktop acceptance for the terminal, project system, and saved stacks remains pending; see the verification record.
 
 ## Available now
 
@@ -15,14 +15,26 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - Resize or hide the explorer and use a compact dark editor interface.
 - Create a project, convert an open folder into one, and edit its name, stack, architecture, default branch, and commands.
 - Detect `.tbce/project.json` when a folder opens, and reopen earlier projects from the Recent list.
+- Save selected project files and command defaults as reusable local stacks; edit details, replace snapshots, or delete stacks with confirmation.
+- Create an independent project from a saved stack or start with a blank project.
 
-Stack and architecture catalogs, Git/GitHub integration, running project commands, and the rest of V1 are not implemented in this milestone.
+Architecture catalogs, Git/GitHub integration, running project commands, and the rest of V1 remain for later milestones.
 
 ## Projects
 
-A TBCE project is a folder containing `.tbce/project.json`. The file records a schema version, name, stack, architecture, default branch, and commands. Stack and architecture are free text until their own milestones supply catalogs. Commands are stored for later milestones; TBCE does not run them yet. A project also reports whether a `.git` entry exists at its root, without invoking Git.
+A TBCE project is a folder containing `.tbce/project.json`. The file records a schema version, name, stack, architecture, default branch, and commands. New projects store their saved stack's stable ID; settings suggest saved stacks while retaining legacy values. Architecture remains free text until milestone 5. Commands are stored for later milestones; TBCE does not run them yet. A project also reports whether a `.git` entry exists at its root, without invoking Git.
 
 Opening a folder that has no manifest still works exactly as before. Use the project button in the explorer to convert it, or to edit an existing project's settings. Recent projects are remembered locally; an entry that no longer opens is reported and removed.
+
+## Saved stacks
+
+Open **Stacks** in the activity bar and choose **Save current project as stack**. Plain folders work too. Enter a name, description, languages, frameworks, and command defaults, then review the file tree. Unsaved edits can be saved first, or the snapshot can use files already on disk without discarding your buffers.
+
+Git history and `.tbce` metadata are always omitted. Dependency folders, build output, caches, and `.env` files start unchecked; `.env.example` remains selected. Expand folders and adjust checkboxes to choose the files to reuse. Refresh resets the selection and rereads files after external changes. Binary assets and empty directories can be saved, independently of the editor's text-file limits.
+
+The library starts empty, without built-in templates or downloads. **New project** / **Create project** offers a blank project or a saved stack, lets you review defaults, and opens a native parent-folder picker. Creation refuses an existing destination. Source files and internal package names remain unchanged; TBCE creates fresh project metadata. Install dependencies yourself through the terminal.
+
+Stacks live under the application's data directory (`%APPDATA%/com.tbce.app/stacks` on Windows), independently of their source folders and the Recent list. Replacement publishes a new snapshot only after it succeeds; previous snapshot generations remain as recovery data until the stack is deleted. Deletion uses the Recycle Bin and leaves generated projects intact. Export/import, automatic source synchronization, and snapshot-history controls are deferred.
 
 ## Development
 
@@ -66,11 +78,11 @@ Click the workspace name in the explorer to select the root before creating a ro
 
 ## Current limits
 
-One workspace per window, explicit saves, and no session restoration or crash recovery. Supported files are UTF-8, optionally with BOM, up to 10 MiB, using LF or CRLF. Binary files, other encodings, mixed/legacy line endings, symlinks, and junctions are rejected with an explanation. Monaco language features are bundled locally; no CDN or account is required.
+One workspace per window, explicit saves, and no editor session restoration or crash recovery. The editor supports UTF-8 files, optionally with BOM, up to 10 MiB, using LF or CRLF. Binary files, other encodings, and mixed/legacy line endings cannot be edited but can be copied in stack snapshots. Symlinks and junctions are rejected. Monaco language features are bundled locally; no CDN or account is required.
 
 One terminal at a time, running the operating system's default shell. Multiple terminal tabs, terminal names, command history, and choosing a shell arrive in later milestones. On Windows the session is started in UTF-8 so that tool output and non-ASCII file names survive; `cmd.exe` and PowerShell are recognized, and any other shell keeps the code page it starts with. Closing a terminal ends its session and its scrollback. Closing the window stops every shell.
 
-Filesystem access is confined to the selected workspace by Rust validation. Destructive operations cannot target its root. The terminal starts in the workspace root and the webview cannot choose a program or directory, but commands the user types run with the application's privileges: the shell is not a sandbox. See the architecture notes for the local-process race limitation before building untrusted automation on these services.
+Rust confines editing and snapshot source reads to the selected workspace, saved stacks to application data, and new-project creation to a native-picked parent. Destructive editor operations cannot target the workspace root. The terminal starts in the workspace root and the webview cannot choose a program or directory, but commands the user types run with the application's privileges: the shell is not a sandbox. See the architecture notes for the local-process race limitation before building untrusted automation on these services.
 
 ## Documentation
 

@@ -3,14 +3,12 @@ import { actions, useProject } from '../src/stores/project';
 import { useWorkspace } from '../src/stores/workspace';
 import { projects } from '../src/services/project';
 import { fileSystem } from '../src/services/filesystem';
-import { ask } from '../src/stores/dialog';
 import type { Project, ProjectManifest } from '../src/types/project';
 vi.mock('../src/services/project', () => ({
   projects: {
     detect: vi.fn(),
     init: vi.fn(),
     update: vi.fn(),
-    createFolder: vi.fn(),
     openRecent: vi.fn(),
   },
 }));
@@ -39,35 +37,6 @@ beforeEach(() => {
   useWorkspace.setState(useWorkspace.getInitialState(), true);
   vi.mocked(fileSystem.list).mockResolvedValue([]);
   vi.mocked(projects.detect).mockResolvedValue({ status: 'none' });
-});
-test('creating a project names the folder, opens it, and writes a manifest', async () => {
-  vi.mocked(ask).mockResolvedValue('My app');
-  vi.mocked(projects.createFolder).mockResolvedValue(workspace);
-  vi.mocked(projects.init).mockResolvedValue(project('My app'));
-  await actions.createProject();
-  expect(projects.createFolder).toHaveBeenCalledWith('My app');
-  expect(projects.init).toHaveBeenCalledWith(
-    '1',
-    expect.objectContaining({ name: 'My app', commands: {} }),
-  );
-  expect(useWorkspace.getState().workspace).toEqual(workspace);
-  expect(useProject.getState().detection).toMatchObject({
-    status: 'found',
-    manifest: { name: 'My app' },
-  });
-  expect(useProject.getState().recent[0]).toMatchObject({
-    path: 'C:/code/app',
-    name: 'My app',
-    isProject: true,
-  });
-});
-test('cancelling the location picker creates no project', async () => {
-  vi.mocked(ask).mockResolvedValue('My app');
-  vi.mocked(projects.createFolder).mockResolvedValue(null);
-  await actions.createProject();
-  expect(projects.init).not.toHaveBeenCalled();
-  expect(useWorkspace.getState().workspace).toBeNull();
-  expect(useProject.getState().recent).toHaveLength(0);
 });
 test('opening a workspace detects its project and records it as recent', async () => {
   vi.mocked(projects.detect).mockResolvedValue({

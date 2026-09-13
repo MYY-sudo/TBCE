@@ -330,21 +330,25 @@ Stacks must be data-driven. Example:
 }
 ```
 
-Initial stacks:
+Milestone 4 scope decision (September 13, 2026): start with an empty personal library. Users save snapshots of their own current projects, including selected files and project defaults. The six originally proposed built-in stacks are deferred.
 
-- React + TypeScript
-- Next.js + TypeScript
-- React + FastAPI
-- Rust + Tauri
-- Empty TypeScript
-- Empty Rust
+Implemented behavior:
+
+- Save the current project or plain folder as a reusable stack.
+- Review a selectable file tree; omit Git/TBCE metadata and deselect dependencies, build output, caches, and environment files by default.
+- Keep snapshots in application data, independent of the source project.
+- Edit details, explicitly replace snapshots, and delete stacks with confirmation.
+- Create an independent new project from a saved stack or create a blank project.
+- Copy files unchanged and write fresh project metadata; no generators, downloads, installs, or automatic command execution.
+
+Architecture selection remains free-form metadata until Milestone 5 supplies presets.
 
 Creation flow:
 
 ```text
 New Project
 → Choose Stack
-→ Choose Architecture
+→ Review Defaults (architecture presets arrive in Milestone 5)
 → Name Project
 → Choose Location
 → Configure

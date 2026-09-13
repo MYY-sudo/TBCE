@@ -183,6 +183,11 @@ fn revision(data: &[u8]) -> String {
 }
 
 impl FileSystemService {
+    pub fn current_id(&self) -> Option<&str> {
+        self.workspace
+            .as_ref()
+            .map(|workspace| workspace.id.as_str())
+    }
     pub fn open(&mut self, path: &Path) -> Result<Workspace> {
         check_chain(path)?;
         let root = fs::canonicalize(path)?;

@@ -23,11 +23,19 @@
 
 ## Within the project system
 
-- Populate stack and architecture from the catalogs that Milestones 4 and 5 introduce. Both are free-form strings today.
+- Add architecture presets in Milestone 5. Stack settings suggest the personal stack catalog and preserve legacy values.
 - Report the branch and repository state once `GitService` exists. A project only reports whether a `.git` entry is present.
 - Run the stored project commands through `ProcessService` in Milestone 13. They are stored and edited but never executed.
 - Keep recent projects in webview local storage until a real persistence requirement justifies a database. Clearing site data clears the list.
 - Reconsider concurrent edits to `project.json`. It is written directly, without the revision checks that source files use.
+
+## Within saved stacks
+
+- Complete installed-app acceptance checks 28–35, including file selection, native confirmations, persistence across restart, and project creation.
+- Consider import/export and a snapshot-history/cleanup interface. Replaced snapshot generations currently remain as recovery data until the stack is deleted.
+- Consider progress reporting and cancellation during large captures. Current operations show a busy state and block workspace changes until they finish.
+- Test macOS/Linux and filesystem permission preservation. Windows is the current target; snapshots preserve file bytes and directory structure, not platform-specific ACLs or executable modes.
+- No framework generators, built-in stacks, automatic dependency installation, or source synchronization are included.
 
 ## Within the interface
 
@@ -37,8 +45,8 @@
 
 See the [full product vision and V1/V2 roadmap](roadmap.md) for every milestone, completion criteria, and security requirement.
 
-Next: Milestone 4, saved stacks, followed by architectures, local Git and Git UI, GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
+Milestone 4's personal saved stacks are implemented with automated coverage; desktop acceptance remains pending. Next: architectures, local Git and Git UI, GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
 
-Before starting Milestone 4, finish desktop acceptance checks 15–27 for the corrected terminal and project system. The September 13 review fixed the identified defects and passed automated checks, but desktop verification could not run because the Computer Use connection was unavailable. See `verification.md` for the exact results and limitation.
+Desktop acceptance checks 15–27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28–35. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
 
 The current implementation does not claim V1 completion. Advanced automation remains outside the foundation/editor scope.

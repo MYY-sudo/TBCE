@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { actions, useProject } from '../stores/project';
 import type { ProjectFields } from '../types/project';
+import { stackActions, useStacks } from '../stores/stack';
 const COMMANDS = ['install', 'dev', 'build', 'test'] as const;
 const trimmed = (value: string) => value.trim() || null;
 export function ProjectSettingsDialog({
@@ -15,6 +16,10 @@ export function ProjectSettingsDialog({
   const ref = useRef<HTMLDialogElement>(null);
   const busy = useProject((s) => s.busy);
   const [fields, setFields] = useState(initial);
+  const stacks = useStacks((s) => s.stacks);
+  useEffect(() => {
+    void stackActions.load();
+  }, []);
   useEffect(() => {
     const dialog = ref.current!;
     dialog.showModal();
@@ -82,9 +87,22 @@ export function ProjectSettingsDialog({
               onChange={(e) => setFields({ ...fields, name: e.target.value })}
             />
           </label>
-          {text('Stack', fields.stack, (stack) =>
-            setFields({ ...fields, stack }),
-          )}
+          <label className="field">
+            <span>Stack</span>
+            <input
+              list="saved-stack-options"
+              disabled={busy}
+              value={fields.stack ?? ''}
+              onChange={(e) => setFields({ ...fields, stack: e.target.value })}
+            />
+            <datalist id="saved-stack-options">
+              {stacks.map((stack) => (
+                <option key={stack.id} value={stack.id}>
+                  {stack.name}
+                </option>
+              ))}
+            </datalist>
+          </label>
           {text('Architecture', fields.architecture, (architecture) =>
             setFields({ ...fields, architecture }),
           )}

@@ -1,6 +1,12 @@
 fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "list_stacks",
+            "inspect_stack_source",
+            "save_stack",
+            "edit_stack",
+            "delete_stack",
+            "create_project_from_stack",
             "choose_workspace",
             "choose_file",
             "list_directory",
@@ -12,7 +18,6 @@ fn main() {
             "detect_project",
             "init_project",
             "update_project",
-            "create_project_folder",
             "open_recent_project",
             "start_terminal",
             "write_terminal",

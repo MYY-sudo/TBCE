@@ -1,6 +1,6 @@
 # Architecture
 
-TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, and the project system. No repository integration, database, or project-template behavior is exposed yet.
+TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, and personal saved stacks. Repository integration and a database remain deferred.
 
 ## Boundaries
 
@@ -31,40 +31,59 @@ xterm.js view
   → pseudo terminal → shell process
 ```
 
-The Rust service owns the selected root and a generation identifier. The frontend receives a display path and identifier, then supplies only relative paths for filesystem operations. Replacing the workspace invalidates the previous identifier. Native pickers choose folders and files. Reopening a recent project is the single exception, described under the security boundary.
+The Rust filesystem service owns the selected root and a generation identifier. The frontend receives a display path and identifier, then supplies relative paths for editor operations and snapshot capture. Replacing the workspace invalidates the previous identifier. Native pickers choose folders, files, and new-project parents. Reopening a recent project accepts an absolute path; the stack library uses a backend-owned application-data root, as described below.
 
 Commands return serializable values or `{ code, message }` errors. The service adapter is the only filesystem IPC caller. Window lifecycle integration lives in a separate service. The workspace store serializes user operations and owns tabs, dirty baselines, directory cache, and prompts. React renders those states; Monaco owns editor models, undo stacks, and per-tab view state.
 
 ## Native command contract
 
-| Command                 | Arguments                                           | Result                                  |
-| ----------------------- | --------------------------------------------------- | --------------------------------------- |
-| `choose_workspace`      | None; native folder picker                          | Workspace or null                       |
-| `choose_file`           | `workspaceId`; native file picker                   | Relative path or null                   |
-| `list_directory`        | `workspaceId`, `path`                               | Entries with name, path, kind           |
-| `read_file`             | `workspaceId`, `path`                               | UTF-8 content, revision, BOM flag, path |
-| `write_file`            | `workspaceId`, `path`, `content`, `revision`, `bom` | Saved document                          |
-| `create_entry`          | `workspaceId`, `path`, `directory`                  | Void                                    |
-| `rename_entry`          | `workspaceId`, `from`, `to`                         | Void                                    |
-| `trash_entry`           | `workspaceId`, `path`; native confirmation          | Whether deletion was confirmed          |
-| `detect_project`        | `workspaceId`                                       | None, found manifest, or invalid reason |
-| `init_project`          | `workspaceId`, `fields`                             | Project                                 |
-| `update_project`        | `workspaceId`, `fields`                             | Project                                 |
-| `create_project_folder` | `name`; native folder picker for the parent         | Workspace or null                       |
-| `open_recent_project`   | `path`                                              | Workspace                               |
-| `start_terminal`        | `workspaceId`                                       | Terminal identifier and shell name      |
-| `restart_terminal`      | `workspaceId`, `id`                                 | Terminal identifier and shell name      |
-| `write_terminal`        | `id`, `data`                                        | Void                                    |
-| `resize_terminal`       | `id`, `cols`, `rows`                                | Void                                    |
-| `stop_terminal`         | `id`                                                | Void                                    |
+| Command                     | Arguments                                                                         | Result                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `choose_workspace`          | None; native folder picker                                                        | Workspace or null                                                                      |
+| `choose_file`               | `workspaceId`; native file picker                                                 | Relative path or null                                                                  |
+| `list_directory`            | `workspaceId`, `path`                                                             | Entries with name, path, kind                                                          |
+| `read_file`                 | `workspaceId`, `path`                                                             | UTF-8 content, revision, BOM flag, path                                                |
+| `write_file`                | `workspaceId`, `path`, `content`, `revision`, `bom`                               | Saved document                                                                         |
+| `create_entry`              | `workspaceId`, `path`, `directory`                                                | Void                                                                                   |
+| `rename_entry`              | `workspaceId`, `from`, `to`                                                       | Void                                                                                   |
+| `trash_entry`               | `workspaceId`, `path`; native confirmation                                        | Whether deletion was confirmed                                                         |
+| `detect_project`            | `workspaceId`                                                                     | None, found manifest, or invalid reason                                                |
+| `init_project`              | `workspaceId`, `fields`                                                           | Project                                                                                |
+| `update_project`            | `workspaceId`, `fields`                                                           | Project                                                                                |
+| `list_stacks`               | None                                                                              | Stacks and warnings for damaged definitions                                            |
+| `inspect_stack_source`      | `workspaceId`, relative directory `path`                                          | File/directory selections with size, revision, exclusion defaults, and blocked reasons |
+| `save_stack`                | `workspaceId`, optional existing `id`, `fields`, selected `entries`               | Stack or null after cancelled replacement confirmation                                 |
+| `edit_stack`                | `id`, `fields`                                                                    | Stack with updated details/defaults                                                    |
+| `delete_stack`              | `id`; native confirmation                                                         | Whether deletion was confirmed                                                         |
+| `create_project_from_stack` | Current `workspaceId` or null, optional `stackId`, `fields`; native parent picker | Workspace or null                                                                      |
+| `open_recent_project`       | `path`                                                                            | Workspace                                                                              |
+| `start_terminal`            | `workspaceId`                                                                     | Terminal identifier and shell name                                                     |
+| `restart_terminal`          | `workspaceId`, `id`                                                               | Terminal identifier and shell name                                                     |
+| `write_terminal`            | `id`, `data`                                                                      | Void                                                                                   |
+| `resize_terminal`           | `id`, `cols`, `rows`                                                              | Void                                                                                   |
+| `stop_terminal`             | `id`                                                                              | Void                                                                                   |
 
 Terminal output and exit codes arrive on the `terminal:event` channel as `{ kind: "output", id, data }` or `{ kind: "exit", id, code }`. The frontend subscribes before starting a shell and ignores exit reports from a replaced session.
 
 ## Project behavior
 
-`ProjectService` is stateless: commands resolve the open workspace root through `FileSystemService`, then read or write `.tbce/project.json` beneath it. Detection reports one of three outcomes — no manifest, a manifest, or a manifest TBCE could not read — so a corrupt or future-schema file degrades to an explanation instead of an error. Project settings replace the stored fields rather than merging them. Stack and architecture are free-form strings until their own milestones; `commands` is stored and edited but never executed, because running commands belongs to the command milestone and must reuse `ProcessService`. A project reports whether a `.git` entry exists at its root; no Git command is ever invoked.
+`ProjectService` is stateless: commands resolve the open workspace root through `FileSystemService`, then read or write `.tbce/project.json` beneath it. Detection reports one of three outcomes — no manifest, a manifest, or a manifest TBCE could not read — so a corrupt or future-schema file degrades to an explanation instead of an error. Project settings replace the stored fields rather than merging them. Stack settings suggest the saved catalog and preserve unknown legacy strings. Architecture stays free-form until milestone 5. `commands` is stored and edited but never executed, because running commands belongs to the command milestone and must reuse `ProcessService`. A project reports whether a `.git` entry exists at its root; no Git command is ever invoked.
 
 The frontend keeps recent projects in webview local storage, capped and deduplicated by path. Losing that list costs a convenience, never project data, so no database is introduced for it.
+
+## Saved stacks
+
+The Stacks panel and dialogs call a Zustand store and typed `TemplateService` adapter. Native commands delegate to the Rust template service on blocking worker threads. Library operations are serialized by a dedicated mutex; source capture and project creation also lock the filesystem workspace identity. The UI holds its workspace operation guard during capture/creation, including unsaved-change decisions, so a second workspace operation cannot invalidate the first.
+
+Each stack has an opaque stable ID and a schema-version-1 `stack.json` under `<app_data>/stacks/<id>/`. Its definition records a name, description, language/framework lists, project defaults, active snapshot generation, and selected relative entries with SHA-256 revisions. File bytes live in `<generation>/files/`. The library starts empty and survives source deletion or Recent-list clearing. No database, Git process, generator, network download, or command runner is involved.
+
+Inspection enumerates one directory at a time. The UI recursively loads selected directories and only opens excluded dependency trees on demand. `.git` and `.tbce` components are always excluded. `node_modules`, `target`, `dist`, `build`, `coverage`, `.next`, `.nuxt`, `.cache`, `.venv`, `venv`, `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.turbo`, and `.env`/`.env.*` start deselected; `.env.example` is exempt. Explicit checkbox selection can override these defaults. Links, junctions, invalid paths and special files remain blocked.
+
+Snapshots copy regular files as bytes, including binary assets, and preserve empty directories. Revision checks before, during, and after copying detect source changes. A failed capture leaves the published snapshot intact. Definitions use a synced temporary file and atomic replacement; the active snapshot changes only after copying completes. Old generations remain as recovery data until confirmed stack deletion moves the stack directory to the Recycle Bin. Damaged or future-schema entries are skipped with a catalog warning.
+
+Project creation stages the selected snapshot and a fresh `.tbce/project.json` beside the intended destination. It exclusively creates a new destination directory and moves its staged entries there. Failure cleanup moves back only entries this operation created, attempts to remove the now-empty destination, and reports its path if cleanup cannot finish. Only successful creation changes the native workspace and triggers frontend adoption/Recent detection and retirement of the previous terminal. Picker cancellation and creation errors preserve the old workspace and dirty buffers. A failure opening an already-created project reports its location for recovery.
+
+Project metadata stays at schema version 1: `stack` holds the stable ID, `name` is the new project name, and remaining fields come from reviewed defaults. Source file contents and package names are never substituted. Editing/deleting a saved stack does not rewrite existing projects. The existing local-process race limitation still applies; these services are not an adversarial filesystem sandbox.
 
 ## Terminal behavior
 
@@ -91,7 +110,7 @@ Closing the window terminates every session. Replacing the workspace stops the r
 
 Only the local main window receives the explicitly enumerated application commands and event/close permissions. No shell plugin, generic filesystem plugin permission, remote origin, or credential storage is exposed. Monaco workers, fonts, and application assets are bundled locally.
 
-Reopening a recent project is the one command that accepts an absolute path from the webview instead of a native picker. The path can only come from a folder this application already opened, and opening it still canonicalizes and checks the path exactly as the picker path does. Every other filesystem operation remains confined to the open workspace.
+Reopening a recent project is the one command that accepts an absolute path from the webview instead of a native picker. The path can only come from a folder this application already opened, and opening it still canonicalizes and checks the path exactly as the picker path does. Editor operations and snapshot source reads stay confined to the open workspace. Stack operations resolve opaque IDs beneath a backend-owned application-data directory. New-project writes use a native-picked parent; the webview cannot supply a destination path.
 
 Shell execution is privileged. The webview cannot name a program, arguments, or directory: the terminal commands accept a workspace identifier and start the operating system's default shell in that workspace root. Whatever the user then types runs with the application's own privileges, exactly as it would in any terminal, so the shell is not a sandbox and must not be treated as one.
 
@@ -101,4 +120,4 @@ These checks protect ordinary local editing. They do not provide an OS-level san
 
 ## Future services
 
-SQLite should arrive with an actual persistence requirement. GitService, GitHubService, TemplateService, and ArchitectureService remain independent future services; UI components must continue to call service APIs.
+SQLite should arrive with an actual persistence requirement. GitService, GitHubService, and ArchitectureService remain independent future services; UI components must continue to call service APIs.

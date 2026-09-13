@@ -90,6 +90,27 @@ Items 23 to 27 of the acceptance checklist are not executed in an installed app:
 - Desktop acceptance checks 15–27 remain unexecuted in this review. Computer Use failed with `Computer Use native pipe is unavailable: failed to connect native pipe: The system cannot find the file specified. (os error 2)` on the initial attempt, retry, and retry after resetting the JavaScript session.
 - Milestone 4 remains pending until the desktop acceptance checks can be completed. No stack catalog or project scaffolding was added during this corrective review.
 
+## Milestone 4 — personal saved stacks, September 13, 2026
+
+### Automated verification
+
+- Frontend suite: 58 passed. Added service/store and React-dialog tests for catalog loading, command defaults and overrides, selected files, deliberate inclusion of excluded files/directories, inspection failure and refresh, metadata editing, empty-library guidance, snapshot dirty-buffer choices, creation cancellation/failure, operation serialization, stale workspace rejection, replacement cancellation, and confirmed deletion. The old folder-only creation tests were replaced by tests for the staged creation flow.
+- Rust suite: 38 passed, including 10 new template tests. These cover an empty library, source deletion and service restart, binary/BOM/CRLF/Unicode file preservation, empty directories, fresh project metadata, exclusion defaults and overrides, stable IDs on replacement, failure preserving the old snapshot, metadata edits/deletion leaving generated projects intact, invalid paths and collisions, corrupt/future catalogs, corrupt snapshot contents, and Windows junction containment.
+- TypeScript, ESLint, Prettier, Rust formatting, and Clippy with warnings denied: passed.
+- Final production frontend build and NSIS release packaging: passed. Executable: `src-tauri/target/release/tbce.exe`; installer: `src-tauri/target/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`. This new package has not been installed or exercised through the desktop interface.
+- Milestone 4 installer SHA-256: `C0B0550E49C3AAD100692C04B445E685C6074FF40B083DCDD8E1017DE4A50369`.
+
+### Desktop and visual verification limits
+
+- The prerequisite desktop checks 15–27 were attempted before implementation, but Computer Use returned `Computer Use native pipe is unavailable: failed to connect native pipe: The system cannot find the file specified. (os error 2)`. Retrying after implementation returned the same error.
+- The browser connection also returned `No browser is available`, so no screenshot/layout verification was performed. React tests exercise behavior under jsdom, not rendering in WebView2.
+- The user requested implementation and then continuation; implementation and automated verification proceeded. Installed-app acceptance checks 15–35 remain pending, including native confirmation/picker behavior, terminal integration, packaged persistence across restart, and minimum-window-size layout. Automated tests do not substitute for those checks.
+- The first elevated release-build request was rejected by automatic approval review because its service hit a usage limit. A retry after the user's continuation was accepted.
+
+### Implementation limits
+
+Snapshot generations are local and independent; replacements retain old generations as recovery data until stack deletion. There is no history browser, import/export, automatic synchronization, progress percentage, or mid-copy cancellation. Normal copy failures preserve the old snapshot; abrupt termination can leave unused staging directories. Snapshot copying preserves bytes and directory structure, not platform-specific ACLs or executable modes. Other operating systems and adversarial local filesystem races are unverified.
+
 ## Build notes
 
 Vite reports a large lazy Monaco chunk, expected for the bundled editor and language support. Tauri warns that the requested `com.tbce.app` identifier ends in `.app`; it is retained as specified, with macOS packaging deferred. Initial sandbox path-access errors were resolved by running build tools with the required filesystem access.

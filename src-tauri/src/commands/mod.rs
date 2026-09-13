@@ -1,15 +1,116 @@
-use crate::filesystem::{
-    valid_name, Document, Entry, FileSystemService, Result, ServiceError, Workspace,
-};
+use crate::filesystem::{Document, Entry, FileSystemService, Result, ServiceError, Workspace};
 use crate::project::{Project, ProjectDetection, ProjectFields, ProjectService};
+use crate::templates::{Catalog, SourceEntry, Stack, StackFields, TemplateService};
 use crate::terminal::{Terminal, TerminalEvent, TerminalService};
 use std::path::Path;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
 pub type Backend = Mutex<FileSystemService>;
 pub type Terminals = Mutex<TerminalService>;
+pub type Templates = Mutex<()>;
+
+async fn template_task<T: Send + 'static>(
+    app: AppHandle,
+    task: impl FnOnce(TemplateService, AppHandle) -> Result<T> + Send + 'static,
+) -> Result<T> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Templates>();
+        let _guard = state
+            .lock()
+            .map_err(|_| ServiceError::new("INTERNAL", "Stack library is unavailable."))?;
+        let root = app
+            .path()
+            .app_data_dir()
+            .map_err(|e| ServiceError::new("IO_ERROR", e.to_string()))?
+            .join("stacks");
+        task(TemplateService::new(root)?, app.clone())
+    })
+    .await
+    .map_err(|e| ServiceError::new("INTERNAL", e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn list_stacks(app: AppHandle) -> Result<Catalog> {
+    template_task(app, |service, _| service.list()).await
+}
+#[tauri::command]
+pub async fn inspect_stack_source(
+    app: AppHandle,
+    workspace_id: String,
+    path: String,
+) -> Result<Vec<SourceEntry>> {
+    template_task(app, move |_, app| {
+        let state = app.state::<Backend>();
+        let backend = lock(&state)?;
+        TemplateService::inspect(&backend.root_path(&workspace_id)?, &path)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn save_stack(
+    app: AppHandle,
+    workspace_id: String,
+    id: Option<String>,
+    fields: StackFields,
+    entries: Vec<SourceEntry>,
+) -> Result<Option<Stack>> {
+    template_task(app, move |service, app| {
+        if id.is_some() && !app.dialog().message("Replace this stack's saved files and defaults with the selected project snapshot? Existing projects will stay unchanged.").title("Replace saved stack").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show() { return Ok(None); }
+        let state = app.state::<Backend>();
+        let backend = lock(&state)?;
+        service.save(&backend.root_path(&workspace_id)?, id.as_deref(), fields, entries).map(Some)
+    }).await
+}
+#[tauri::command]
+pub async fn edit_stack(app: AppHandle, id: String, fields: StackFields) -> Result<Stack> {
+    template_task(app, move |service, _| service.edit(&id, fields)).await
+}
+#[tauri::command]
+pub async fn delete_stack(app: AppHandle, id: String) -> Result<bool> {
+    template_task(app, move |service, app| {
+        if !app.dialog().message("Move this saved stack to the Recycle Bin? Projects created from it will stay unchanged.").title("Delete saved stack").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show() { return Ok(false); }
+        service.delete(&id)?;
+        Ok(true)
+    }).await
+}
+#[tauri::command]
+pub async fn create_project_from_stack(
+    app: AppHandle,
+    workspace_id: Option<String>,
+    stack_id: Option<String>,
+    fields: ProjectFields,
+) -> Result<Option<Workspace>> {
+    template_task(app, move |service, app| {
+        let Some(parent) = app.dialog().file().blocking_pick_folder() else {
+            return Ok(None);
+        };
+        let parent = parent
+            .into_path()
+            .map_err(|e| ServiceError::new("INVALID_PATH", e.to_string()))?;
+        let state = app.state::<Backend>();
+        let mut backend = lock(&state)?;
+        if backend.current_id() != workspace_id.as_deref() {
+            return Err(ServiceError::new(
+                "STALE_WORKSPACE",
+                "The workspace changed. Try creating the project again.",
+            ));
+        }
+        let path = service.create(&parent, fields, stack_id.as_deref())?;
+        backend.open(&path).map(Some).map_err(|e| {
+            ServiceError::new(
+                "OPEN_FAILED",
+                format!(
+                    "Project created at {}, but could not be opened: {}",
+                    path.display(),
+                    e.message
+                ),
+            )
+        })
+    })
+    .await
+}
 fn lock(state: &Backend) -> Result<std::sync::MutexGuard<'_, FileSystemService>> {
     state
         .lock()
@@ -162,34 +263,6 @@ pub async fn update_project(
 ) -> Result<Project> {
     let root = lock(&state)?.root_path(&workspace_id)?;
     ProjectService::update(&root, fields)
-}
-#[tauri::command]
-pub async fn create_project_folder(
-    app: AppHandle,
-    state: State<'_, Backend>,
-    name: String,
-) -> Result<Option<Workspace>> {
-    if name.contains('/') || name.contains('\\') || !valid_name(&name) {
-        return Err(ServiceError::new(
-            "INVALID_NAME",
-            "Enter a folder name, not a path.",
-        ));
-    }
-    let parent =
-        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
-            .await
-            .map_err(|e| ServiceError::new("DIALOG_ERROR", e.to_string()))?;
-    match parent {
-        Some(parent) => {
-            let path = parent
-                .into_path()
-                .map_err(|e| ServiceError::new("INVALID_PATH", e.to_string()))?
-                .join(&name);
-            std::fs::create_dir(&path)?;
-            Ok(Some(lock(&state)?.open(&path)?))
-        }
-        None => Ok(None),
-    }
 }
 #[tauri::command]
 pub async fn open_recent_project(state: State<'_, Backend>, path: String) -> Result<Workspace> {

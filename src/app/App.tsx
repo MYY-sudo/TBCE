@@ -12,6 +12,7 @@ import {
   X,
   Circle,
   AlertTriangle,
+  Layers,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { actions as terminalActions, useTerminal } from '../stores/terminal';
@@ -21,6 +22,8 @@ import { Dialog } from '../components/Dialog';
 import { Explorer } from '../explorer/Explorer';
 import { fileName, isDirty } from '../types/workspace';
 import { guardWindowClose } from '../services/window';
+import { StacksPanel } from '../templates/StacksPanel';
+import { NewProjectDialog } from '../templates/StackDialogs';
 const Editor = lazy(() => import('../editor/Editor'));
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 export function App() {
@@ -31,6 +34,8 @@ export function App() {
   const projectBusy = useProject((s) => s.busy);
   const projectError = useProject((s) => s.error);
   const [sidebar, setSidebar] = useState(true);
+  const [panel, setPanel] = useState<'explorer' | 'stacks'>('explorer');
+  const [newProject, setNewProject] = useState(false);
   const [width, setWidth] = useState(252);
   const [dock, setDock] = useState(248);
   const active = state.tabs.find((t) => t.id === state.activeId);
@@ -44,7 +49,12 @@ export function App() {
       })
       .catch((error) => useWorkspace.setState({ error: String(error) }));
     const keydown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || useDialog.getState().request) return;
+      if (
+        !(e.ctrlKey || e.metaKey) ||
+        useDialog.getState().request ||
+        document.querySelector('dialog[open]')
+      )
+        return;
       const key = e.key.toLowerCase();
       if (['s', 'w', 'o', '`'].includes(key)) e.preventDefault();
       else return;
@@ -98,6 +108,14 @@ export function App() {
             Open folder
           </button>
           <button
+            disabled={state.busy || projectBusy}
+            onClick={() => setNewProject(true)}
+            title="Create project"
+          >
+            <FolderPlus size={15} />
+            <span>Create project</span>
+          </button>
+          <button
             disabled={state.busy || !active || !isDirty(active)}
             onClick={() => void actions.save()}
           >
@@ -125,12 +143,26 @@ export function App() {
       <div className="workbench">
         <nav className="activity-bar" aria-label="Workspace navigation">
           <button
-            className="activity-active"
+            className={panel === 'explorer' && sidebar ? 'activity-active' : ''}
             title="Explorer"
             aria-label="Explorer"
-            onClick={() => setSidebar(!sidebar)}
+            onClick={() => {
+              setSidebar(panel !== 'explorer' || !sidebar);
+              setPanel('explorer');
+            }}
           >
             <Files size={21} />
+          </button>
+          <button
+            title="Stacks"
+            aria-label="Stacks"
+            className={panel === 'stacks' && sidebar ? 'activity-active' : ''}
+            onClick={() => {
+              setSidebar(panel !== 'stacks' || !sidebar);
+              setPanel('stacks');
+            }}
+          >
+            <Layers size={21} />
           </button>
           <button
             className="activity-bottom"
@@ -146,7 +178,7 @@ export function App() {
         {sidebar && (
           <>
             <div style={{ width, flexShrink: 0 }}>
-              <Explorer />
+              {panel === 'explorer' ? <Explorer /> : <StacksPanel />}
             </div>
             <div
               role="separator"
@@ -283,7 +315,7 @@ export function App() {
                   </button>
                   <button
                     disabled={state.busy || projectBusy}
-                    onClick={() => void projectActions.createProject()}
+                    onClick={() => setNewProject(true)}
                   >
                     <FolderPlus size={16} />
                     New project
@@ -414,6 +446,7 @@ export function App() {
         </span>
       </footer>
       <Dialog />
+      {newProject && <NewProjectDialog onClose={() => setNewProject(false)} />}
     </div>
   );
 }

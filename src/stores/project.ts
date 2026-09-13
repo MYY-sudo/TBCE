@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { projects } from '../services/project';
 import { actions as workspaceActions, useWorkspace } from './workspace';
-import { ask } from './dialog';
-import { emptyFields, type ProjectDetection } from '../types/project';
+import type { ProjectDetection } from '../types/project';
 import type { Project, ProjectFields, RecentProject } from '../types/project';
 import type { ServiceError, Workspace } from '../types/workspace';
 const KEY = 'tbce.recentProjects';
@@ -155,26 +154,6 @@ export const actions = {
       }
     }
   },
-  createProject: () =>
-    perform(async (context) => {
-      if (!(await workspaceActions.canCloseWindow())) return;
-      const name = await ask({
-        title: 'New project',
-        message: 'Name the project, then choose where to create its folder.',
-        input: '',
-        actions: [
-          { label: 'Cancel', value: 'cancel' },
-          { label: 'Choose location', value: 'submit' },
-        ],
-      });
-      if (!name) return;
-      const workspace = await projects.createFolder(name);
-      if (!workspace) return;
-      context.workspaceId = workspace.id;
-      await workspaceActions.setWorkspace(workspace, 'Project created');
-      if (!isCurrent(workspace.id)) return;
-      adopt(await projects.init(workspace.id, emptyFields(name)), workspace);
-    }),
   openRecent: (path: string) =>
     perform(async (context) => {
       if (!(await workspaceActions.canCloseWindow())) return;

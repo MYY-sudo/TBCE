@@ -21,8 +21,6 @@ export const projects = {
     call<Project>('init_project', { workspaceId, fields }),
   update: (workspaceId: string, fields: ProjectFields) =>
     call<Project>('update_project', { workspaceId, fields }),
-  createFolder: (name: string) =>
-    call<Workspace | null>('create_project_folder', { name }),
   openRecent: (path: string) =>
     call<Workspace>('open_recent_project', { path }),
 };

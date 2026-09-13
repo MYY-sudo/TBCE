@@ -184,6 +184,52 @@ async function checkExternal() {
   }
 }
 export const actions = {
+  replaceWorkspace: async (
+    create: (workspaceId: string | null) => Promise<Workspace | null>,
+  ) => {
+    let created = false;
+    const success = await perform(async () => {
+      if (!(await confirmDirty(get().tabs))) return;
+      const workspace = await create(get().workspace?.id ?? null);
+      if (!workspace) return;
+      await adopt(workspace, 'Project created');
+      created = true;
+    });
+    return success && created;
+  },
+  snapshot: async (read: (workspaceId: string) => Promise<void>) => {
+    let completed = false;
+    const success = await perform(async () => {
+      const workspace = get().workspace;
+      if (!workspace) return;
+      if (get().tabs.some(isDirty)) {
+        const choice = await ask({
+          title: 'Save files before capturing the stack?',
+          message:
+            'Stacks capture files on disk. Choose whether to save your unsaved edits first.',
+          actions: [
+            { label: 'Cancel', value: 'cancel' },
+            { label: 'Use files on disk', value: 'disk' },
+            { label: 'Save all and continue', value: 'save' },
+          ],
+        });
+        if (!choice || choice === 'cancel') return;
+        if (choice === 'save')
+          for (const tab of get().tabs) if (!(await saveTab(tab.id))) return;
+      }
+      await read(workspace.id);
+      completed = true;
+    });
+    return success && completed;
+  },
+  withWorkspace: (workspaceId: string, operation: () => Promise<void>) =>
+    perform(async () => {
+      if (get().workspace?.id !== workspaceId)
+        throw new Error(
+          'The workspace changed. Reopen Save stack to select its files.',
+        );
+      await operation();
+    }),
   openWorkspace: () =>
     perform(async () => {
       if (!(await confirmDirty(get().tabs))) return;
