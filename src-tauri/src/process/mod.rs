@@ -1,10 +1,15 @@
 use crate::filesystem::{Result, ServiceError};
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize, PtySystem};
 use std::{
+    borrow::Cow,
+    ffi::{OsStr, OsString},
     fmt::Display,
     io::{Read, Write},
+    path::Path,
+    process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
+        mpsc::{channel, Receiver},
         Arc,
     },
     thread,
@@ -12,6 +17,14 @@ use std::{
 };
 
 const READ_CHUNK: usize = 8 * 1024;
+/// Captured output is bounded so a runaway child cannot exhaust memory.
+pub const CAPTURE_CAP: usize = 8 * 1024 * 1024;
+const WAIT_POLL: Duration = Duration::from_millis(10);
+// A child's own exit does not prove its readers finished: a grandchild can inherit the pipe and
+// hold it open. Waiting briefly collects ordinary trailing output without hanging the caller.
+const DRAIN_WINDOW: Duration = Duration::from_millis(500);
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 // ConPTY keeps the output pipe open while the master end lives, so a reader never sees EOF when the
 // child exits. Trailing output is drained during this window instead of being ordered behind EOF.
 const FLUSH_WINDOW: Duration = Duration::from_millis(120);
@@ -82,6 +95,130 @@ fn decode(buffer: &mut Vec<u8>) -> String {
             }
         }
     }
+}
+
+// Canonicalized local drive paths carry a \\?\ prefix. CMD rejects it as a working directory and
+// CreateProcess does not accept it reliably either, so it is stripped for both the shell and the
+// bounded runner. UNC and device paths are left exactly as they are.
+pub(crate) fn working_directory(root: &Path) -> Cow<'_, Path> {
+    #[cfg(windows)]
+    {
+        use std::{
+            os::windows::ffi::{OsStrExt, OsStringExt},
+            path::{Component, PathBuf, Prefix},
+        };
+        if matches!(
+            root.components().next(),
+            Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::VerbatimDisk(_))
+        ) {
+            let path: Vec<u16> = root.as_os_str().encode_wide().skip(4).collect();
+            return Cow::Owned(PathBuf::from(OsString::from_wide(&path)));
+        }
+    }
+    Cow::Borrowed(root)
+}
+
+/// One bounded, timed execution of a program with no shell anywhere in the chain.
+pub struct Run<'a> {
+    pub program: &'a OsStr,
+    pub args: &'a [OsString],
+    pub cwd: &'a Path,
+    /// `None` removes the variable for this child only; the parent environment is never mutated.
+    pub env: &'a [(&'a str, Option<OsString>)],
+    pub limit: Duration,
+    pub cap: usize,
+}
+
+#[derive(Debug)]
+pub struct Capture {
+    pub code: i32,
+    pub stdout: Vec<u8>,
+    pub stderr: String,
+    pub truncated: bool,
+}
+
+// Reading continues past the cap and discards the excess, because a child that blocks writing to a
+// full pipe would never exit and would be reported as a timeout instead of as oversized output.
+fn drain(mut reader: impl Read + Send + 'static, cap: usize) -> Receiver<(Vec<u8>, bool)> {
+    let (sender, receiver) = channel();
+    thread::spawn(move || {
+        let mut chunk = [0u8; READ_CHUNK];
+        let mut buffer = Vec::new();
+        let mut truncated = false;
+        while let Ok(count) = reader.read(&mut chunk) {
+            if count == 0 {
+                break;
+            }
+            let room = cap.saturating_sub(buffer.len());
+            if count > room {
+                truncated = true;
+            }
+            buffer.extend_from_slice(&chunk[..count.min(room)]);
+        }
+        let _ = sender.send((buffer, truncated));
+    });
+    receiver
+}
+
+fn collect(receiver: &Receiver<(Vec<u8>, bool)>) -> (Vec<u8>, bool) {
+    // An abandoned reader means output was lost, which is reported as truncation rather than
+    // waited on forever.
+    receiver
+        .recv_timeout(DRAIN_WINDOW)
+        .unwrap_or_else(|_| (Vec::new(), true))
+}
+
+/// Runs a program with piped stdio, a hard deadline and bounded capture. The program and its
+/// arguments are passed as an array, never through a shell, and no console window is created.
+/// Only backend services call this; no Tauri command exposes it to the webview.
+pub fn run(spec: Run<'_>) -> Result<Capture> {
+    let mut command = Command::new(spec.program);
+    command
+        .args(spec.args)
+        .current_dir(working_directory(spec.cwd))
+        // A child that asks for input must fail instead of waiting for a terminal that is not there.
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (key, value) in spec.env {
+        match value {
+            Some(value) => command.env(key, value),
+            None => command.env_remove(key),
+        };
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = command.spawn()?;
+    let missing = || ServiceError::new("INTERNAL", "The process pipes were not created.");
+    let out = drain(child.stdout.take().ok_or_else(missing)?, spec.cap);
+    let errors = drain(child.stderr.take().ok_or_else(missing)?, spec.cap);
+    let deadline = Instant::now() + spec.limit;
+    let status = loop {
+        match child.try_wait()? {
+            Some(status) => break status,
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(ServiceError::new(
+                    "TIMED_OUT",
+                    "The operation took too long and was stopped.",
+                ));
+            }
+            None => thread::sleep(WAIT_POLL),
+        }
+    };
+    let (stdout, cut) = collect(&out);
+    let (mut stderr, trimmed) = collect(&errors);
+    Ok(Capture {
+        code: status.code().unwrap_or(-1),
+        stdout,
+        // Git writes diagnostics as UTF-8; the shared decoder keeps a split sequence intact.
+        stderr: decode(&mut stderr),
+        truncated: cut || trimmed,
+    })
 }
 
 impl ProcessService {
@@ -259,6 +396,140 @@ mod tests {
             }
         }
         false
+    }
+    fn capture(command: &str, limit: Duration, cap: usize) -> Result<Capture> {
+        let program = OsString::from(if cfg!(windows) { "cmd.exe" } else { "/bin/sh" });
+        let args = [
+            OsString::from(if cfg!(windows) { "/C" } else { "-c" }),
+            OsString::from(command),
+        ];
+        run(Run {
+            program: &program,
+            args: &args,
+            cwd: Path::new("."),
+            env: &[],
+            limit,
+            cap,
+        })
+    }
+    #[test]
+    fn captures_separate_streams_and_the_exit_code() {
+        let result = capture(
+            if cfg!(windows) {
+                "echo tbce-out& echo tbce-err 1>&2& exit 3"
+            } else {
+                "echo tbce-out; echo tbce-err 1>&2; exit 3"
+            },
+            LIMIT,
+            CAPTURE_CAP,
+        )
+        .unwrap();
+        assert_eq!(result.code, 3);
+        assert!(
+            String::from_utf8_lossy(&result.stdout).contains("tbce-out"),
+            "{:?}",
+            String::from_utf8_lossy(&result.stdout)
+        );
+        assert!(result.stderr.contains("tbce-err"), "{}", result.stderr);
+        assert!(!result.truncated);
+    }
+    #[test]
+    fn bounded_output_is_truncated_rather_than_unbounded() {
+        let result = capture("echo abcdefghijklmnopqrstuvwxyz", LIMIT, 4).unwrap();
+        assert!(result.stdout.len() <= 4, "{:?}", result.stdout);
+        assert!(result.truncated);
+    }
+    #[test]
+    fn a_child_that_outlives_its_limit_is_stopped() {
+        let start = Instant::now();
+        let error = capture(
+            if cfg!(windows) {
+                "ping -n 30 127.0.0.1 >nul"
+            } else {
+                "sleep 30"
+            },
+            Duration::from_millis(300),
+            CAPTURE_CAP,
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "TIMED_OUT");
+        // The deadline is enforced by stopping the child, not by waiting for it to finish.
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            start.elapsed()
+        );
+    }
+    #[test]
+    fn a_missing_program_is_reported_as_not_found() {
+        let program = OsString::from("tbce-no-such-program");
+        let error = run(Run {
+            program: &program,
+            args: &[],
+            cwd: Path::new("."),
+            env: &[],
+            limit: LIMIT,
+            cap: CAPTURE_CAP,
+        })
+        .unwrap_err();
+        assert_eq!(error.code, "NOT_FOUND");
+    }
+    #[test]
+    fn the_environment_is_changed_only_for_the_child() {
+        std::env::set_var("TBCE_PROBE_KEEP", "parent");
+        let program = OsString::from(if cfg!(windows) { "cmd.exe" } else { "/bin/sh" });
+        let args = [
+            OsString::from(if cfg!(windows) { "/C" } else { "-c" }),
+            OsString::from(if cfg!(windows) {
+                "echo [%TBCE_PROBE_SET%][%TBCE_PROBE_KEEP%]"
+            } else {
+                "echo [$TBCE_PROBE_SET][$TBCE_PROBE_KEEP]"
+            }),
+        ];
+        let child = run(Run {
+            program: &program,
+            args: &args,
+            cwd: Path::new("."),
+            env: &[
+                ("TBCE_PROBE_SET", Some(OsString::from("child"))),
+                ("TBCE_PROBE_KEEP", None),
+            ],
+            limit: LIMIT,
+            cap: CAPTURE_CAP,
+        })
+        .unwrap();
+        let text = String::from_utf8_lossy(&child.stdout).into_owned();
+        assert!(text.contains("[child]"), "{text}");
+        assert!(!text.contains("parent"), "{text}");
+        // Removing a variable for the child leaves the parent's own environment untouched.
+        assert_eq!(std::env::var("TBCE_PROBE_KEEP").unwrap(), "parent");
+        std::env::remove_var("TBCE_PROBE_KEEP");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn working_directory_converts_only_verbatim_drive_paths() {
+        for (input, expected) in [
+            (
+                r"\\?\C:\Users\Masaüstü\yeni proje",
+                r"C:\Users\Masaüstü\yeni proje",
+            ),
+            (r"\\?\C:\", r"C:\"),
+            (
+                r"C:\Users\Masaüstü\yeni proje",
+                r"C:\Users\Masaüstü\yeni proje",
+            ),
+            (r"\\server\share\folder", r"\\server\share\folder"),
+            (
+                r"\\?\UNC\server\share\folder",
+                r"\\?\UNC\server\share\folder",
+            ),
+            (r"\\.\C:\folder", r"\\.\C:\folder"),
+        ] {
+            assert_eq!(
+                working_directory(Path::new(input)).as_os_str(),
+                OsStr::new(expected)
+            );
+        }
     }
     #[test]
     fn decodes_multibyte_output_split_across_reads() {

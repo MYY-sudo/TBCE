@@ -92,13 +92,10 @@ mod tests {
         );
         assert!(destination.join("src/empty").is_dir());
         match ProjectService::detect(&destination).unwrap() {
-            ProjectDetection::Found {
-                manifest, has_git, ..
-            } => {
+            ProjectDetection::Found { manifest, .. } => {
                 assert_eq!(manifest.name, "Türkçe project");
                 assert_eq!(manifest.stack.as_deref(), Some(stack.id.as_str()));
                 assert_eq!(manifest.commands.dev.as_deref(), Some("npm run dev"));
-                assert!(!has_git);
             }
             _ => panic!("Expected project"),
         }
@@ -744,11 +741,21 @@ impl TemplateService {
         }
         Ok(())
     }
+    #[cfg(test)]
     pub fn create(
         &self,
         parent: &Path,
         fields: ProjectFields,
         stack_id: Option<&str>,
+    ) -> Result<PathBuf> {
+        self.create_with_architecture(parent, fields, stack_id, None)
+    }
+    pub fn create_with_architecture(
+        &self,
+        parent: &Path,
+        fields: ProjectFields,
+        stack_id: Option<&str>,
+        architecture: Option<&crate::architecture::Architecture>,
     ) -> Result<PathBuf> {
         let name = fields.name.trim();
         if name.contains(['/', '\\']) || !valid_name(name) {
@@ -759,6 +766,16 @@ impl TemplateService {
         }
         let destination = metadata_path(parent, name)?;
         let stack = stack_id.map(|id| self.get(id)).transpose()?;
+        let preview = crate::architecture::preview(
+            stack.as_ref().map(|s| s.entries.as_slice()).unwrap_or(&[]),
+            architecture,
+        )?;
+        if !preview.conflicts.is_empty() {
+            return Err(ServiceError::new(
+                "STRUCTURE_CONFLICT",
+                format!("Conflicting paths: {}", preview.conflicts.join(", ")),
+            ));
+        }
         // Stage all work on the destination filesystem before reserving the final directory.
         let staging = tempfile::Builder::new()
             .prefix(".tbce-create-")
@@ -770,7 +787,13 @@ impl TemplateService {
             )?;
             Self::copy_entries(&source, staging.path(), &stack.entries)?;
         }
+        if let Some(architecture) = architecture {
+            crate::architecture::ArchitectureService::apply(architecture, staging.path())?;
+        }
         let mut fields = fields;
+        if let Some(architecture) = architecture {
+            fields.architecture = Some(architecture.id.clone());
+        }
         fields.stack = stack_id.map(String::from);
         ProjectService::init(staging.path(), fields)?;
         // create_dir is exclusive even on platforms where rename could replace an empty directory.

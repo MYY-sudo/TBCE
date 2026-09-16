@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { actions, useProject } from '../stores/project';
 import type { ProjectFields } from '../types/project';
 import { stackActions, useStacks } from '../stores/stack';
+import { ArchitectureSelect } from '../architecture/ArchitectureControls';
 const COMMANDS = ['install', 'dev', 'build', 'test'] as const;
 const trimmed = (value: string) => value.trim() || null;
 export function ProjectSettingsDialog({
@@ -103,9 +104,12 @@ export function ProjectSettingsDialog({
               ))}
             </datalist>
           </label>
-          {text('Architecture', fields.architecture, (architecture) =>
-            setFields({ ...fields, architecture }),
-          )}
+          <ArchitectureSelect
+            value={fields.architecture}
+            disabled={busy}
+            metadata
+            onChange={(architecture) => setFields({ ...fields, architecture })}
+          />
           {text('Default branch', fields.defaultBranch, (defaultBranch) =>
             setFields({ ...fields, defaultBranch }),
           )}

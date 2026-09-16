@@ -1,0 +1,8 @@
+﻿cargo.exe : warn: could not canonicalize path C:\Users\mysf5
+At line:5 char:1
++ & cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warn: could not... C:\Users\mysf5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.21s

@@ -51,7 +51,12 @@ test('creating a project asks for a name before touching the filesystem', async 
   const name = await screen.findByLabelText('Name');
   fireEvent.change(name, { target: { value: 'My app' } });
   fireEvent.click(screen.getByRole('button', { name: 'Choose location' }));
-  await waitFor(() =>
-    expect(screen.getByRole('alert')).toHaveTextContent('desktop app'),
-  );
+  expect(
+    await screen.findByText(
+      'Open the TBCE desktop app to use saved architectures.',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Choose location' }),
+  ).toBeDisabled();
 });

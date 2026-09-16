@@ -33,10 +33,12 @@ export const templates = {
     workspaceId: string | null,
     stackId: string | null,
     fields: ProjectFields,
+    architectureId: string | null = null,
   ) =>
     call<Workspace | null>('create_project_from_stack', {
       workspaceId,
       stackId,
       fields,
+      architectureId,
     }),
 };

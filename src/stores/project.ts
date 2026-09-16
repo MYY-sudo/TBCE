@@ -98,7 +98,6 @@ function adopt(project: Project, workspace: Workspace) {
       status: 'found',
       manifest: project.manifest,
       path: project.path,
-      hasGit: project.hasGit,
     },
   });
   updateBusy();
@@ -121,7 +120,6 @@ async function detect(workspace: Workspace, request: number) {
         ? {
             manifest: detection.manifest,
             path: detection.path,
-            hasGit: detection.hasGit,
           }
         : null,
   });

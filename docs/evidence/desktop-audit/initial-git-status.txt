@@ -1,0 +1,28 @@
+﻿ M README.md
+ M docs/acceptance.md
+ M docs/architecture.md
+ M docs/remaining-work.md
+ M docs/roadmap.md
+ M docs/verification.md
+ M src-tauri/build.rs
+ M src-tauri/capabilities/main.json
+ M src-tauri/src/commands/mod.rs
+ M src-tauri/src/lib.rs
+ M src-tauri/src/templates/mod.rs
+ M src/app/App.tsx
+ M src/app/styles.css
+ M src/projects/ProjectSettingsDialog.tsx
+ M src/services/templates.ts
+ M src/stores/stack.ts
+ M src/templates/StackDialogs.tsx
+ M tests/app.test.tsx
+ M tests/stack-dialogs.test.tsx
+ M tests/stack.test.ts
+?? docs/evidence/
+?? docs/milestone-6.md
+?? src-tauri/src/architecture/
+?? src/architecture/
+?? src/services/architecture.ts
+?? src/stores/architecture.ts
+?? src/types/architecture.ts
+?? tests/architecture.test.tsx

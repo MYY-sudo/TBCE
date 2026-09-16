@@ -13,6 +13,7 @@ import {
   Circle,
   AlertTriangle,
   Layers,
+  Blocks,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { actions as terminalActions, useTerminal } from '../stores/terminal';
@@ -24,8 +25,14 @@ import { fileName, isDirty } from '../types/workspace';
 import { guardWindowClose } from '../services/window';
 import { StacksPanel } from '../templates/StacksPanel';
 import { NewProjectDialog } from '../templates/StackDialogs';
+import { ArchitecturesPanel } from '../architecture/ArchitecturesPanel';
 const Editor = lazy(() => import('../editor/Editor'));
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
+// Development only. Vite substitutes this flag with a literal false in a production build, so the
+// branch and its dynamic import are removed and no Git harness chunk is ever emitted.
+const GitHarness = import.meta.env.DEV
+  ? lazy(() => import('../git/GitHarness'))
+  : null;
 export function App() {
   const state = useWorkspace();
   const terminalVisible = useTerminal((s) => s.visible);
@@ -34,7 +41,9 @@ export function App() {
   const projectBusy = useProject((s) => s.busy);
   const projectError = useProject((s) => s.error);
   const [sidebar, setSidebar] = useState(true);
-  const [panel, setPanel] = useState<'explorer' | 'stacks'>('explorer');
+  const [panel, setPanel] = useState<'explorer' | 'stacks' | 'architectures'>(
+    'explorer',
+  );
   const [newProject, setNewProject] = useState(false);
   const [width, setWidth] = useState(252);
   const [dock, setDock] = useState(248);
@@ -165,6 +174,19 @@ export function App() {
             <Layers size={21} />
           </button>
           <button
+            title="Architectures"
+            aria-label="Architectures"
+            className={
+              panel === 'architectures' && sidebar ? 'activity-active' : ''
+            }
+            onClick={() => {
+              setSidebar(panel !== 'architectures' || !sidebar);
+              setPanel('architectures');
+            }}
+          >
+            <Blocks size={21} />
+          </button>
+          <button
             className="activity-bottom"
             title="Toggle terminal (Ctrl+`)"
             aria-label="Toggle terminal"
@@ -178,7 +200,13 @@ export function App() {
         {sidebar && (
           <>
             <div style={{ width, flexShrink: 0 }}>
-              {panel === 'explorer' ? <Explorer /> : <StacksPanel />}
+              {panel === 'explorer' ? (
+                <Explorer />
+              ) : panel === 'stacks' ? (
+                <StacksPanel />
+              ) : (
+                <ArchitecturesPanel />
+              )}
             </div>
             <div
               role="separator"
@@ -424,6 +452,11 @@ export function App() {
           )}
         </main>
       </div>
+      {GitHarness && (
+        <Suspense fallback={null}>
+          <GitHarness />
+        </Suspense>
+      )}
       <footer className="status-bar">
         <span className="status-leading">
           <Check size={12} />

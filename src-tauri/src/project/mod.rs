@@ -41,7 +41,6 @@ pub struct ProjectFields {
 pub struct Project {
     pub manifest: ProjectManifest,
     pub path: String,
-    pub has_git: bool,
 }
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
@@ -50,7 +49,6 @@ pub enum ProjectDetection {
     Found {
         manifest: Box<ProjectManifest>,
         path: String,
-        has_git: bool,
     },
     Invalid {
         message: String,
@@ -70,7 +68,6 @@ fn describe(root: &Path, manifest: ProjectManifest) -> Project {
             .to_string_lossy()
             .trim_start_matches(r"\\?\")
             .to_string(),
-        has_git: root.join(".git").exists(),
     }
 }
 
@@ -89,7 +86,6 @@ impl ProjectService {
                 ProjectDetection::Found {
                     manifest: Box::new(project.manifest),
                     path: project.path,
-                    has_git: project.has_git,
                 }
             }
             Ok(manifest) => ProjectDetection::Invalid {
@@ -171,7 +167,6 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let project = ProjectService::init(temp.path(), fields("Example")).unwrap();
         assert_eq!(project.manifest.name, "Example");
-        assert!(!project.has_git);
         match ProjectService::detect(temp.path()).unwrap() {
             ProjectDetection::Found { manifest, .. } => {
                 assert_eq!(manifest.schema_version, SCHEMA_VERSION);
@@ -251,15 +246,15 @@ mod tests {
         );
     }
     #[test]
-    fn reports_a_git_repository_without_running_git() {
+    fn project_detection_makes_no_claim_about_git() {
         let temp = tempfile::tempdir().unwrap();
         fs::create_dir(temp.path().join(".git")).unwrap();
-        let project = ProjectService::init(temp.path(), fields("Example")).unwrap();
-        assert!(project.has_git);
-        match ProjectService::detect(temp.path()).unwrap() {
-            ProjectDetection::Found { has_git, .. } => assert!(has_git),
-            _ => panic!("expected a detected project"),
-        }
+        ProjectService::init(temp.path(), fields("Example")).unwrap();
+        // Repository state belongs to GitService, which actually runs Git. A bare .git entry
+        // proves nothing, so the project surface no longer reports one.
+        let value = serde_json::to_value(ProjectService::detect(temp.path()).unwrap()).unwrap();
+        assert_eq!(value["status"], "found");
+        assert!(value.get("hasGit").is_none());
     }
 
     #[test]

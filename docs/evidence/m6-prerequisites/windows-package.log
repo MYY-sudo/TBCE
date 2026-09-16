@@ -1,0 +1,36 @@
+﻿
+> tbce@0.1.0 tauri
+> tauri build --target x86_64-pc-windows-msvc
+
+npm.cmd :         Info Looking up installed tauri packages to check mismatched versions...
+At line:2 char:1
++ & npm.cmd run tauri build -- --target x86_64-pc-windows-msvc *> .veri ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (        Info Lo...hed versions...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+        Warn The bundle identifier "com.tbce.app" set in `"tauri.conf.json" identifier` ends with `.app`. This is not recommended because it 
+conflicts with the application bundle extension on macOS.
+     Running beforeBuildCommand `npm run build`
+
+> tbce@0.1.0 build
+> tsc -b && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 2670 modules transformed.
+✗ Build failed in 26.29s
+error during build:
+[vite:prepare-out-dir] EPERM, Permission denied: \\?\C:\Users\mysf5\Masaüstü\TBCE\dist\assets '\\?\C:\Users\mysf5\Masa�st�\TBCE\dist\assets'
+    at Object.rmSync (node:fs:1222:18)
+    at emptyDir (file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/vite/dist/node/chunks/config.js:2167:11)
+    at prepareOutDir (file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/vite/dist/node/chunks/config.js:33405:55)
+    at Object.handler (file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/vite/dist/node/chunks/config.js:33395:6)
+    at Object.handler (file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/vite/dist/node/chunks/config.js:33823:13)
+    at file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/rollup/dist/es/shared/node-entry.js:22864:40
+    at async Promise.all (index 0)
+    at async PluginDriver.hookParallel (file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/rollup/dist/es/shared/node-entry.js:22774:9)
+    at async Bundle.generate (file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/rollup/dist/es/shared/node-entry.js:20899:13)
+    at async file:///C:/Users/mysf5/Masa%C3%BCst%C3%BC/TBCE/node_modules/rollup/dist/es/shared/node-entry.js:23853:27
+beforeBuildCommand `npm run build` failed with exit code 1
+       Error beforeBuildCommand `npm run build` failed with exit code 1

@@ -22,7 +22,6 @@ export interface ProjectFields {
 export interface Project {
   manifest: ProjectManifest;
   path: string;
-  hasGit: boolean;
 }
 export type ProjectDetection =
   | { status: 'none' }
@@ -30,7 +29,6 @@ export type ProjectDetection =
       status: 'found';
       manifest: ProjectManifest;
       path: string;
-      hasGit: boolean;
     }
   | { status: 'invalid'; message: string };
 export interface RecentProject {

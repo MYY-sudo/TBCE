@@ -1,0 +1,16 @@
+V04 - the development-only Git harness is absent from the production bundle
+Date: 2026-09-15T21:05:26Z
+Command: npm run build (clean dist)
+
+$ grep -rl 'tbce-git-harness-dev-only' dist/
+(no matches - the harness marker is not in the bundle)
+
+$ grep -rl 'GitHarness' dist/
+(no matches - the component is not in the bundle)
+
+$ ls dist/assets | grep -i 'git\|harness'
+(no harness chunk was emitted)
+
+The shipped typed adapter src/services/git.ts does name the commands, which is expected:
+$ grep -rl 'git_commit' dist/
+dist/assets/index-B_CjAY-3.js

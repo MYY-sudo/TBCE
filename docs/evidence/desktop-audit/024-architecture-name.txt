@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-15T18:33:25.384Z",
+  "window": {
+    "app": "process:C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-audit\\installed\\tbce.exe",
+    "id": 393924,
+    "title": "TBCE"
+  },
+  "accessibility": {
+    "document_text": "￼",
+    "focused_element": "20 document TBCE ID: RootWebArea",
+    "tree": "Window: \"TBCE\", App: tbce.exe.\n\t0 window TBCE Secondary Actions: Raise\n\t\t1 pane\n\t\t\t8 pane TBCE\n\t\t\t\t9 pane (disabled)\n\t\t\t\t10 region TBCE - Web content\n\t\t\t\t\t11 region\n\t\t\t\t\t\t12 region\n\t\t\t\t\t\t\t13 region\n\t\t\t\t\t\t\t\t14 region\n\t\t\t\t\t\t\t\t15 region\n\t\t\t\t\t\t\t\t\t16 region\n\t\t\t\t\t\t\t\t\t\t17 region\n\t\t\t\t\t\t\t\t\t\t\t18 region\n\t\t\t\t\t\t\t\t\t\t\t\t19 region\n\t\t\t\t\t\t\t\t\t\t\t\t20 document TBCE ID: RootWebArea\n\t\t\t\t\t\t\t\t\t\t\t\t\t358 dialog New architecture Secondary Actions: Raise\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t359 heading New architecture\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t360 text Name\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t361 edit Name\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t362 text Description\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t363 edit Description\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t364 text Recommended boundaries\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t365 edit Recommended boundaries Description: Describe responsibilities and dependencies between layers.\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t366 text Folders (one relative path per line)\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t367 edit Folders (one relative path per line) Description: src/domainsrc/application\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t368 text STARTER FILES\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t369 button Add starter file\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t370 text Files are copied as UTF-8 text. Use / between folders. Git and TBCE metadata paths are reserved.\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t371 list Folder structure\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t372 list item No starter files or folders.\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t373 button Cancel\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t374 button Save architecture\n\t\t\t\t\t\t\t\t89 region\n\t\t\t\t\t\t90 region\n\t\t\t\t\t\t91 region\n\t\t2 title bar\n\t\t\t3 menu bar System ID: MenuBar\n\t\t\t\t4 menu item System\n\t\t\t5 button Minimize\n\t\t\t6 button Maximize\n\t\t\t7 button Close\n\nDocument text: ```\n￼\n```"
+  }
+}

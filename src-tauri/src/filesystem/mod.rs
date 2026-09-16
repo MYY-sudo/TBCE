@@ -141,7 +141,7 @@ pub fn valid_name(name: &str) -> bool {
             && stem.as_bytes()[3].is_ascii_digit()))
 }
 
-fn validate_relative(relative: &str) -> Result<()> {
+pub(crate) fn validate_relative(relative: &str) -> Result<()> {
     if relative.is_empty() {
         return Ok(());
     }

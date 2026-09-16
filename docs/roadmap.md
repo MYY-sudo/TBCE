@@ -341,14 +341,14 @@ Implemented behavior:
 - Create an independent new project from a saved stack or create a blank project.
 - Copy files unchanged and write fresh project metadata; no generators, downloads, installs, or automatic command execution.
 
-Architecture selection remains free-form metadata until Milestone 5 supplies presets.
+Architecture selection uses Milestone 5's personal catalog; unavailable legacy values remain metadata.
 
 Creation flow:
 
 ```text
 New Project
 → Choose Stack
-→ Review Defaults (architecture presets arrive in Milestone 5)
+→ Review Defaults and Choose a Personal Architecture
 → Name Project
 → Choose Location
 → Configure
@@ -363,13 +363,16 @@ Support custom projects too.
 
 **Goal:** Allow project structure to be predefined.
 
-Initial presets:
+Milestone 5 implementation scope, confirmed September 13, 2026:
 
-- Simple
-- MVC
-- Layered
-- Clean Architecture
-- Modular Monolith
+- Start with an empty personal catalog; no built-in presets.
+- Define architectures in a structure editor with a name, description, recommended boundaries, folders, and UTF-8 starter files.
+- Save, edit, and delete local definitions independently of projects and stacks.
+- Apply only while creating a new project, optionally combined with a saved stack.
+- Preview the merged structure; common folders merge, while file and case conflicts block creation.
+- Preserve unavailable legacy values as metadata. Existing project settings do not generate or move files.
+
+The originally suggested Simple, MVC, Layered, Clean Architecture, and Modular Monolith presets are deferred, along with project capture and application to existing projects.
 
 Example:
 
@@ -387,7 +390,7 @@ Architecture definitions should support:
 - Description
 - Recommended boundaries
 - Generated starter files
-- Future validation rules
+- A versioned format that can later be extended with validation rules
 
 Do not implement advanced rule enforcement yet.
 
@@ -396,6 +399,19 @@ Do not implement advanced rule enforcement yet.
 #### Milestone 6 — Git backend
 
 **Goal:** TBCE should fully understand local repository state.
+
+Execution tracking: [Milestone 6 checklist](milestone-6.md). The September 15,
+2026 scope decision keeps this milestone backend-only, uses existing Git
+credentials, and requires earlier desktop acceptance to pass before implementation.
+Pull is fast-forward-only; force push and merge/rebase workflows are deferred.
+Only steps with matching verification evidence may be checked off.
+
+**Delivered September 16, 2026** as eighteen `git_*` commands behind a Rust
+`GitService` and a typed adapter, covered by automated tests against real Git. The
+conceptual API below is implemented in full. Under the September 16 scope decision the
+backend was built while a [manual run-sheet](acceptance-runsheet-m6.md) was prepared for
+installed-app checks 15-42, so this milestone is **not** desktop-accepted; see the
+[verification record](verification.md).
 
 Use local Git CLI initially. Implement:
 

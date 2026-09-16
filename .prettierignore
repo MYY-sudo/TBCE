@@ -5,3 +5,5 @@ src-tauri/Cargo.lock
 dist
 node_modules
 .verification
+# Captured verification evidence is raw data; reformatting it would destroy the record.
+docs/evidence

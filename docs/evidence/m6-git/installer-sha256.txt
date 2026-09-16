@@ -1,0 +1,1 @@
+d87f715d8d62a2c153458ffdcfaabec789b5e3494f1bd06287309bf641101ef4 *src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe

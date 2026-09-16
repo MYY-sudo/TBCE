@@ -857,3 +857,74 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+/* Personal architecture editor and structure previews. */
+.field textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid var(--border, #303039);
+  border-radius: 5px;
+  background: #17171d;
+  color: inherit;
+  padding: 9px;
+  font: inherit;
+}
+.field .architecture-code {
+  font-family: Consolas, monospace;
+  min-height: 104px;
+}
+.architecture-boundaries {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.architecture-selection {
+  min-width: 0;
+}
+.structure-tree {
+  list-style: none;
+  padding: 12px;
+  max-height: 220px;
+  overflow: auto;
+  background: #17171d;
+  border-radius: 5px;
+  font:
+    12px/1.7 Consolas,
+    monospace;
+}
+.structure-tree li {
+  white-space: nowrap;
+}
+.starter-file {
+  border: 1px solid #303039;
+  border-radius: 5px;
+  padding: 12px;
+  margin: 12px 0;
+  min-width: 0;
+}
+
+/* Development-only Git harness. Removed from production builds with its component. */
+.git-harness {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  max-height: 260px;
+  overflow: auto;
+  font-size: 11px;
+}
+.git-harness h2 {
+  font-size: 11px;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.git-harness-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.git-harness pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

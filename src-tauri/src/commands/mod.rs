@@ -1,8 +1,10 @@
+use crate::architecture::{Architecture, ArchitectureFields, ArchitectureService, Preview};
 use crate::filesystem::{Document, Entry, FileSystemService, Result, ServiceError, Workspace};
+use crate::git::{self, GitService};
 use crate::project::{Project, ProjectDetection, ProjectFields, ProjectService};
 use crate::templates::{Catalog, SourceEntry, Stack, StackFields, TemplateService};
 use crate::terminal::{Terminal, TerminalEvent, TerminalService};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
@@ -10,6 +12,63 @@ use tauri_plugin_dialog::DialogExt;
 pub type Backend = Mutex<FileSystemService>;
 pub type Terminals = Mutex<TerminalService>;
 pub type Templates = Mutex<()>;
+pub type Git = Mutex<()>;
+
+fn architecture_service(app: &AppHandle) -> Result<ArchitectureService> {
+    ArchitectureService::new(
+        app.path()
+            .app_data_dir()
+            .map_err(|e| ServiceError::new("IO_ERROR", e.to_string()))?
+            .join("architectures"),
+    )
+}
+// Share the template library lock: preview, creation and both catalogs see a coherent selection.
+#[tauri::command]
+pub async fn list_architectures(app: AppHandle) -> Result<crate::architecture::Catalog> {
+    template_task(app, |_, app| architecture_service(&app)?.list()).await
+}
+#[tauri::command]
+pub async fn get_architecture(app: AppHandle, id: String) -> Result<Architecture> {
+    template_task(app, move |_, app| architecture_service(&app)?.get(&id)).await
+}
+#[tauri::command]
+pub async fn save_architecture(
+    app: AppHandle,
+    id: Option<String>,
+    fields: ArchitectureFields,
+) -> Result<Architecture> {
+    template_task(app, move |_, app| {
+        architecture_service(&app)?.save(id.as_deref(), fields)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn delete_architecture(app: AppHandle, id: String) -> Result<bool> {
+    template_task(app, move |_, app| {
+        if !app.dialog().message("Move this saved architecture to the Recycle Bin? Existing projects will stay unchanged.").title("Delete saved architecture").buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel).blocking_show() { return Ok(false); }
+        architecture_service(&app)?.delete(&id)?;
+        Ok(true)
+    }).await
+}
+#[tauri::command]
+pub async fn preview_project_structure(
+    app: AppHandle,
+    stack_id: Option<String>,
+    architecture_id: Option<String>,
+) -> Result<Preview> {
+    template_task(app, move |service, app| {
+        let stack = stack_id.as_deref().map(|id| service.get(id)).transpose()?;
+        let architecture = architecture_id
+            .as_deref()
+            .map(|id| architecture_service(&app)?.get(id))
+            .transpose()?;
+        crate::architecture::preview(
+            stack.as_ref().map(|s| s.entries.as_slice()).unwrap_or(&[]),
+            architecture.as_ref(),
+        )
+    })
+    .await
+}
 
 async fn template_task<T: Send + 'static>(
     app: AppHandle,
@@ -80,6 +139,7 @@ pub async fn create_project_from_stack(
     app: AppHandle,
     workspace_id: Option<String>,
     stack_id: Option<String>,
+    architecture_id: Option<String>,
     fields: ProjectFields,
 ) -> Result<Option<Workspace>> {
     template_task(app, move |service, app| {
@@ -97,7 +157,16 @@ pub async fn create_project_from_stack(
                 "The workspace changed. Try creating the project again.",
             ));
         }
-        let path = service.create(&parent, fields, stack_id.as_deref())?;
+        let architecture = architecture_id
+            .as_deref()
+            .map(|id| architecture_service(&app)?.get(id))
+            .transpose()?;
+        let path = service.create_with_architecture(
+            &parent,
+            fields,
+            stack_id.as_deref(),
+            architecture.as_ref(),
+        )?;
         backend.open(&path).map(Some).map_err(|e| {
             ServiceError::new(
                 "OPEN_FAILED",
@@ -111,6 +180,243 @@ pub async fn create_project_from_stack(
     })
     .await
 }
+/// Serializes repository operations. The workspace root is resolved only after the Git lock is
+/// held -- that queue wait is exactly when a workspace switch can land, so staleness is caught
+/// here -- and the filesystem guard is released before Git runs, so a slow repository never
+/// blocks saving a file.
+async fn git_task<T: Send + 'static>(
+    app: AppHandle,
+    workspace_id: String,
+    task: impl FnOnce(PathBuf, &AppHandle) -> Result<T> + Send + 'static,
+) -> Result<T> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Git>();
+        let _guard = state
+            .lock()
+            .map_err(|_| ServiceError::new("INTERNAL", "Git service is unavailable."))?;
+        let root = lock(&app.state::<Backend>())?.root_path(&workspace_id)?;
+        task(root, &app)
+    })
+    .await
+    .map_err(|e| ServiceError::new("INTERNAL", e.to_string()))?
+}
+
+/// The project manifest only ever supplies a fallback name for the default branch.
+fn recorded_default(root: &Path) -> Option<String> {
+    match ProjectService::detect(root) {
+        Ok(ProjectDetection::Found { manifest, .. }) => manifest.default_branch.clone(),
+        _ => None,
+    }
+}
+
+#[tauri::command]
+pub async fn git_clone_repository(
+    app: AppHandle,
+    workspace_id: Option<String>,
+    source: String,
+    folder: String,
+) -> Result<Option<git::CloneOutcome>> {
+    // Cloning needs no open workspace, so this is the one Git command that does not resolve one.
+    // The destination parent still comes from a native picker, never from the webview.
+    let _ = workspace_id;
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Git>();
+        let _guard = state
+            .lock()
+            .map_err(|_| ServiceError::new("INTERNAL", "Git service is unavailable."))?;
+        git::validate_remote(&source)?;
+        let Some(parent) = app.dialog().file().blocking_pick_folder() else {
+            return Ok(None);
+        };
+        let parent = parent
+            .into_path()
+            .map_err(|e| ServiceError::new("INVALID_PATH", e.to_string()))?;
+        // The clone is reported, not opened: switching workspaces stays an explicit user action.
+        git::clone(&source, &parent, &folder).map(Some)
+    })
+    .await
+    .map_err(|e| ServiceError::new("INTERNAL", e.to_string()))?
+}
+#[tauri::command]
+pub async fn git_fetch(
+    app: AppHandle,
+    workspace_id: String,
+    remote: Option<String>,
+) -> Result<git::Status> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.fetch(remote.as_deref())
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_pull(app: AppHandle, workspace_id: String) -> Result<git::Status> {
+    git_task(app, workspace_id, |root, _| GitService::open(&root)?.pull()).await
+}
+#[tauri::command]
+pub async fn git_push(
+    app: AppHandle,
+    workspace_id: String,
+    set_upstream: bool,
+) -> Result<git::Status> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.push(set_upstream)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_stage(
+    app: AppHandle,
+    workspace_id: String,
+    paths: Vec<String>,
+) -> Result<git::Status> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.stage(&paths)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_stage_all(app: AppHandle, workspace_id: String) -> Result<git::Status> {
+    git_task(app, workspace_id, |root, _| {
+        GitService::open(&root)?.stage_all()
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_unstage(
+    app: AppHandle,
+    workspace_id: String,
+    paths: Vec<String>,
+) -> Result<git::Status> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.unstage(&paths)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_commit(
+    app: AppHandle,
+    workspace_id: String,
+    message: String,
+) -> Result<git::Commit> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.commit(&message)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_create_branch(
+    app: AppHandle,
+    workspace_id: String,
+    name: String,
+    start_point: Option<String>,
+) -> Result<git::Branches> {
+    git_task(app, workspace_id, move |root, _| {
+        let service = GitService::open(&root)?;
+        service.create_branch(&name, start_point.as_deref())?;
+        service.branches(recorded_default(&root).as_deref())
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_checkout_branch(
+    app: AppHandle,
+    workspace_id: String,
+    name: String,
+) -> Result<git::Status> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.checkout(&name)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_delete_branch(app: AppHandle, workspace_id: String, name: String) -> Result<bool> {
+    git_task(app, workspace_id, move |root, app| {
+        // The backend confirms too, so invoking the command cannot bypass the destructive prompt.
+        let service = GitService::open(&root)?;
+        let message =
+            format!("Delete the branch \"{name}\"? Commits only on this branch may be lost.");
+        let confirmed = app
+            .dialog()
+            .message(message)
+            .title("Delete branch")
+            .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancel)
+            .blocking_show();
+        if !confirmed {
+            return Ok(false);
+        }
+        service.delete_branch(&name, recorded_default(&root).as_deref())?;
+        Ok(true)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_history(
+    app: AppHandle,
+    workspace_id: String,
+    skip: u32,
+    limit: u32,
+    path: Option<String>,
+) -> Result<git::History> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.history(skip, limit, path.as_deref())
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_diff(
+    app: AppHandle,
+    workspace_id: String,
+    path: String,
+    staged: bool,
+) -> Result<git::FileDiff> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.diff(&path, staged)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_diff_summary(
+    app: AppHandle,
+    workspace_id: String,
+    staged: bool,
+) -> Result<Vec<git::DiffStat>> {
+    git_task(app, workspace_id, move |root, _| {
+        GitService::open(&root)?.diff_summary(staged)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn git_detect_repository(app: AppHandle, workspace_id: String) -> Result<git::Detection> {
+    git_task(app, workspace_id, |root, _| Ok(GitService::detect(&root))).await
+}
+#[tauri::command]
+pub async fn git_init_repository(
+    app: AppHandle,
+    workspace_id: String,
+    default_branch: Option<String>,
+) -> Result<git::Repository> {
+    git_task(app, workspace_id, move |root, _| {
+        git::init(&root, default_branch.as_deref())
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_status(app: AppHandle, workspace_id: String) -> Result<git::Status> {
+    git_task(app, workspace_id, |root, _| {
+        GitService::open(&root)?.status()
+    })
+    .await
+}
+#[tauri::command]
+pub async fn git_branches(app: AppHandle, workspace_id: String) -> Result<git::Branches> {
+    git_task(app, workspace_id, |root, _| {
+        GitService::open(&root)?.branches(recorded_default(&root).as_deref())
+    })
+    .await
+}
+
 fn lock(state: &Backend) -> Result<std::sync::MutexGuard<'_, FileSystemService>> {
     state
         .lock()

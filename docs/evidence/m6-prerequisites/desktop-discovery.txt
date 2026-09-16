@@ -1,0 +1,21 @@
+Milestone 6 prerequisite audit — September 15, 2026
+Provider: Computer Use skill, node_repl + @oai/sky
+
+Attempt 1:
+  Import @oai/sky and initialize globalThis.sky: succeeded.
+  await sky.list_apps(): failed.
+  Computer Use native pipe is unavailable: failed to connect native pipe: The system cannot find the file specified. (os error 2)
+
+Recovery:
+  Reset node_repl JavaScript kernel: succeeded.
+  Import @oai/sky and initialize globalThis.sky again: succeeded.
+
+Attempt 2:
+  await sky.list_apps(): failed.
+  Computer Use native pipe is unavailable: failed to connect native pipe: The system cannot find the file specified. (os error 2)
+
+Observed result: no app/window could be selected; no installed-app scenario ran.
+Acceptance result: BLOCKED, not passed and not an application test failure.
+Scope: acceptance checks 15–42 and outstanding earlier editor scenarios.
+Recovery required: a working desktop automation connection or documented manual acceptance against the identified build.
+This file transcribes tool outcomes; it is not a screenshot or a successful UI test.

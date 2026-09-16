@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-15T18:32:14.041Z",
+  "window": {
+    "app": "process:C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-audit\\installed\\tbce.exe",
+    "id": 393924,
+    "title": "TBCE"
+  },
+  "accessibility": {
+    "document_text": "￼",
+    "focused_element": "20 document TBCE ID: RootWebArea",
+    "tree": "Window: \"TBCE\", App: tbce.exe.\n\t0 window TBCE Secondary Actions: Raise\n\t\t1 pane\n\t\t\t8 pane TBCE\n\t\t\t\t9 pane (disabled)\n\t\t\t\t10 region TBCE - Web content\n\t\t\t\t\t11 region\n\t\t\t\t\t\t12 region\n\t\t\t\t\t\t\t13 region\n\t\t\t\t\t\t\t\t14 region\n\t\t\t\t\t\t\t\t15 region\n\t\t\t\t\t\t\t\t\t16 region\n\t\t\t\t\t\t\t\t\t\t17 region\n\t\t\t\t\t\t\t\t\t\t\t18 region\n\t\t\t\t\t\t\t\t\t\t\t\t19 region\n\t\t\t\t\t\t\t\t\t\t\t\t20 document TBCE ID: RootWebArea\n\t\t\t\t\t\t\t\t\t\t\t\t\t200 dialog Secondary Actions: Raise\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t201 text TBCE PROJECT\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t202 heading Convert to project\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t203 text This writes .tbce/project.json so TBCE recognizes this folder as a project.\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t204 text Name\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t205 edit Name\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t206 text Stack\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t207 combo box Stack\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t208 text Architecture\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t209 combo box Architecture\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t210 text This changes metadata only. Structures are generated when creating new projects.\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t211 text Default branch\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t212 edit Default branch\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t213 text COMMANDS\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t214 text Install\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t215 edit Install\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t216 text Dev\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t217 edit Dev\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t218 text Build\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t219 edit Build\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t220 text Test\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t221 edit Test\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t222 text Commands are stored for later milestones. TBCE does not run them yet.\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t223 button Cancel\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t224 button Create project file\n\t\t\t\t\t\t\t\t89 region\n\t\t\t\t\t\t90 region\n\t\t\t\t\t\t91 region\n\t\t2 title bar\n\t\t\t3 menu bar System ID: MenuBar\n\t\t\t\t4 menu item System\n\t\t\t5 button Minimize\n\t\t\t6 button Maximize\n\t\t\t7 button Close\n\nDocument text: ```\n￼\n```"
+  }
+}

@@ -38,4 +38,48 @@ Use a disposable local folder with spaces and Unicode characters in its name. Ke
 34. Test source links/junctions and a damaged saved-stack definition in a disposable library. Links must be unavailable; corrupt or future-schema entries must show an actionable warning without hiding healthy stacks.
 35. Check keyboard navigation, Escape and busy-state behavior, stack selection/default editing, long names, large file trees, and dialog scrolling at 1280 × 820 and the minimum 800 × 540 window size. Ensure every dialog action remains reachable.
 
+36. Open Architectures with an empty disposable library. Create a named architecture with description, boundaries, nested/empty folders, and UTF-8 starter files containing Turkish characters. Check the structure tree, add/remove file controls, validation errors, and unsaved-change cancellation.
+37. Restart TBCE. Confirm architecture persistence, edit its name and contents, and confirm its ID stays stable. A malformed or future-schema definition must show a warning while healthy entries remain usable.
+38. Create a blank project with the saved architecture. Verify empty directories, literal UTF-8 contents, a fresh schema-version-1 manifest with the architecture ID, Recent detection, and no command execution.
+39. Create with a stack and architecture sharing folders. Verify both sets of files survive. Test duplicate file paths, file/directory conflicts, and different casing; preview must show conflicts and disable creation. Choose a different architecture or none and confirm recovery.
+40. Select architectures in project settings and stack defaults. Confirm settings only change metadata; a known stack default is selected during creation. Unavailable legacy/deleted values must remain visible as metadata, with an explanation that they generate no structure.
+41. Cancel and confirm architecture deletion. Check Recycle Bin recovery and that existing projects stay unchanged. Exercise picker cancellation, failed creation, and repeated submission with an old dirty workspace and terminal; cancellation/failure must preserve the old workspace and successful creation must retire its terminal.
+42. Check keyboard navigation, Escape, busy controls, long paths/content, and dialog scrolling at 1280 × 820 and 800 × 540. Ensure all architecture editor and new-project actions remain reachable.
+
+## Git backend — installed-app checks
+
+These exercise the Milestone 6 backend through the packaged application. Use the
+development harness for commands that have no interface yet; it is present in
+`npm run tauri dev` only. Work in disposable repositories with spaces and Turkish
+characters in their paths, and confirm every result with the `git` command line
+outside TBCE.
+
+43. Open a plain folder that is not a repository and confirm no branch label appears. Initialize a repository, reopen the folder, and confirm the label shows the new branch and that `git status` outside TBCE agrees. Repeat in a folder that already has a repository and confirm initializing is refused.
+44. Open a subdirectory of a repository. Confirm TBCE reports that the repository is above it and refuses status, staging and commits until the repository root is opened.
+45. Rename `git.exe` out of the way, or edit `PATH` so Git cannot be found, and reopen a repository. Confirm the folder still opens, the editor still works, and TBCE explains that Git is unavailable rather than failing to open.
+46. With staged and unstaged edits to the same file, confirm both are reported separately. Add a rename, a deletion, an untracked file, and a file with Turkish characters in its name; confirm every path is shown correctly and matches `git status --porcelain=v2`.
+47. Create a merge conflict outside TBCE. Confirm the conflicted file is reported, and that committing is refused until it is resolved.
+48. Create a branch and confirm the current branch does not change. Switch branches with a clean tree, then make an edit and confirm switching is refused with the edit intact.
+49. Delete a merged branch and confirm the native prompt, that cancelling preserves it, and that confirming removes it. Confirm deletion is refused for the current branch, the default branch, an unmerged branch, and a branch checked out in another worktree.
+50. Stage individual paths and everything, including a deletion. Unstage and confirm with a file comparison that the working file is byte-identical. Repeat before the first commit in a new repository.
+51. Commit with an empty message, with nothing staged, and with `user.email` unset; confirm each is refused with an explanation and that no commit is created. Set an identity, commit, and confirm `git show` outside TBCE matches what was staged rather than later edits.
+52. Read history in a repository with more commits than one page, and confirm paging and that an unborn branch reports an empty history rather than an error. View diffs for a text file, a binary file, and a renamed file.
+53. Using a local bare repository as a remote and two clones, fetch, pull and push. Confirm ahead and behind counts change as expected and are blank when a branch has no upstream. Make the clones diverge, then confirm pull and push are both refused and that the bare repository is unchanged.
+54. Clone from a local path into a folder you name, under a natively picked parent. Confirm cancelling the picker creates nothing, that an existing destination name is refused with its contents intact, and that a failed clone leaves no partial folder. Confirm the clone does not switch the open workspace.
+55. Attempt to clone `ext::sh -c touch pwn`, a `git://` URL and an `http://` URL. Each must be refused before anything runs, with no folder created.
+56. Start a long fetch against an unreachable host and confirm TBCE reports a failure within the timeout instead of hanging, and that no console window appears during any Git operation.
+
 Record the checks actually performed in `verification.md`; distinguish automated service tests from installed-app UI checks.
+
+## Milestone 6 prerequisite evidence
+
+Checks 15-42 and the earlier editor gaps listed in the
+[delivery checklist](milestone-6.md) remain the prerequisite gate. Under the
+September 16, 2026 scope decision the Git backend was implemented while a
+[manual run-sheet](acceptance-runsheet-m6.md) was prepared for these checks, so they
+are still outstanding rather than superseded.
+For each scenario, record the build identity, expected outcome, observed outcome,
+evidence path (screenshots and independent disk/process observations as relevant),
+and pass/fail/blocked status. A test-suite pass or an installer hash does not prove
+an installed-app scenario. Desktop discovery on September 15 failed before any
+scenario could run, including after a fresh-session retry; these checks remain open.

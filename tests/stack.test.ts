@@ -75,7 +75,6 @@ test('creation adopts the workspace and records its detected project', async () 
       commands: stack.defaults.commands,
     },
     path: destination.path,
-    hasGit: false,
   });
   expect(
     await stackActions.create(stack.id, {
@@ -87,6 +86,7 @@ test('creation adopts the workspace and records its detected project', async () 
     '1',
     stack.id,
     expect.objectContaining({ name: 'New' }),
+    null,
   );
   expect(useWorkspace.getState().workspace).toEqual(destination);
   await vi.waitFor(() =>

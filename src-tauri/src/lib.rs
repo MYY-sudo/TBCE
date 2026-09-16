@@ -1,5 +1,7 @@
+mod architecture;
 mod commands;
 mod filesystem;
+mod git;
 mod process;
 mod project;
 mod templates;
@@ -13,6 +15,7 @@ pub fn run() {
         .manage(commands::Backend::default())
         .manage(commands::Terminals::default())
         .manage(commands::Templates::default())
+        .manage(commands::Git::default())
         .on_window_event(|window, event| {
             // Shell processes keep running after the window is gone unless they are stopped here.
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -22,6 +25,29 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::git_clone_repository,
+            commands::git_fetch,
+            commands::git_pull,
+            commands::git_push,
+            commands::git_stage,
+            commands::git_stage_all,
+            commands::git_unstage,
+            commands::git_commit,
+            commands::git_create_branch,
+            commands::git_checkout_branch,
+            commands::git_delete_branch,
+            commands::git_history,
+            commands::git_diff,
+            commands::git_diff_summary,
+            commands::git_detect_repository,
+            commands::git_init_repository,
+            commands::git_status,
+            commands::git_branches,
+            commands::list_architectures,
+            commands::get_architecture,
+            commands::save_architecture,
+            commands::delete_architecture,
+            commands::preview_project_structure,
             commands::list_stacks,
             commands::inspect_stack_source,
             commands::save_stack,

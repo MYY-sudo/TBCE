@@ -1,0 +1,7 @@
+﻿cargo.exe : warn: could not canonicalize path C:\Users\mysf5
+At line:2 char:1
++ & cargo fmt --manifest-path src-tauri/Cargo.toml --check *> .verifica ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warn: could not... C:\Users\mysf5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

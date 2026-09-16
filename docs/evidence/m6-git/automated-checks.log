@@ -1,0 +1,28 @@
+TBCE Milestone 6 - automated verification
+Date: 2026-09-15T21:04:17Z
+Git: git version 2.54.0.windows.1
+Node: v24.15.0  npm: 11.12.1
+Cargo: cargo 1.96.0 (30a34c682 2026-05-25)
+HEAD: 3acb15ef7577aa23973876459583489fc33ec670
+
+== npm run format:check ==
+Checking formatting...
+All matched files use Prettier code style!
+== npm run lint ==
+> eslint .
+
+== npx tsc -b ==
+exit=0
+== npm test ==
+ Test Files  10 passed (10)
+      Tests  73 passed (73)
+== cargo fmt --check ==
+exit=0
+== cargo clippy -D warnings ==
+   Compiling tbce v0.1.0 (C:\Users\mysf5\Masaüstü\TBCE\src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.41s
+== cargo test ==
+running 81 tests
+test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.13s
+running 0 tests
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

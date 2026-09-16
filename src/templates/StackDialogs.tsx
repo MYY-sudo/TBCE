@@ -5,6 +5,13 @@ import { actions as workspaceActions, useWorkspace } from '../stores/workspace';
 import { useProject } from '../stores/project';
 import { emptyFields, fieldsOf, type ProjectFields } from '../types/project';
 import type { SourceEntry, Stack, StackFields } from '../types/stack';
+import {
+  ArchitectureSelect,
+  StructureTree,
+} from '../architecture/ArchitectureControls';
+import { useArchitectures } from '../stores/architecture';
+import { architectures } from '../services/architecture';
+import type { StructurePreview } from '../types/architecture';
 
 export function StackModal({
   title,
@@ -43,24 +50,22 @@ export function DefaultFields({
   fields,
   change,
   disabled,
+  metadata = true,
 }: {
   fields: ProjectFields;
   change: (fields: ProjectFields) => void;
   disabled: boolean;
+  metadata?: boolean;
 }) {
   return (
     <>
       <div className="field-grid">
-        <label className="field">
-          <span>Architecture</span>
-          <input
-            disabled={disabled}
-            value={fields.architecture ?? ''}
-            onChange={(e) =>
-              change({ ...fields, architecture: e.target.value || null })
-            }
-          />
-        </label>
+        <ArchitectureSelect
+          value={fields.architecture}
+          disabled={disabled}
+          metadata={metadata}
+          onChange={(architecture) => change({ ...fields, architecture })}
+        />
         <label className="field">
           <span>Default branch</span>
           <input
@@ -115,6 +120,49 @@ export function NewProjectDialog({
     ...(initial?.defaults ?? emptyFields('')),
     name: '',
   });
+  const catalog = useArchitectures();
+  const architectureId =
+    catalog.architectures.find((a) => a.id === fields.architecture)?.id ?? null;
+  const previewKey = JSON.stringify([stackId, architectureId]);
+  const [preview, setPreview] = useState<{
+    key: string;
+    result?: StructurePreview;
+    error?: string;
+  } | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (catalog.loaded && !catalog.busy && !catalog.error) {
+      void architectures
+        .preview(stackId || null, architectureId)
+        .then((result) => {
+          if (active) setPreview({ key: previewKey, result });
+        })
+        .catch((e: unknown) => {
+          if (active)
+            setPreview({
+              key: previewKey,
+              error: (e as { message?: string })?.message || String(e),
+            });
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [
+    stackId,
+    architectureId,
+    previewKey,
+    catalog.loaded,
+    catalog.busy,
+    catalog.error,
+  ]);
+  const currentPreview = preview?.key === previewKey ? preview : null;
+  const ready =
+    catalog.loaded &&
+    !catalog.busy &&
+    !catalog.error &&
+    !!currentPreview?.result &&
+    !currentPreview.result.conflicts.length;
   useEffect(() => {
     void stackActions.load();
   }, []);
@@ -123,8 +171,13 @@ export function NewProjectDialog({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (!ready || busy) return;
           void stackActions
-            .create(stackId || null, { ...fields, name: fields.name.trim() })
+            .create(
+              stackId || null,
+              { ...fields, name: fields.name.trim() },
+              architectureId,
+            )
             .then((ok) => {
               if (ok) onClose();
             });
@@ -174,7 +227,42 @@ export function NewProjectDialog({
           A new folder with this name will be created inside the location you
           choose. Files keep their original contents and package names.
         </p>
-        <DefaultFields fields={fields} change={setFields} disabled={busy} />
+        <DefaultFields
+          fields={fields}
+          change={setFields}
+          disabled={busy}
+          metadata={false}
+        />
+        {currentPreview?.result && (
+          <>
+            <span className="field-legend">PROJECT STRUCTURE</span>
+            <StructureTree entries={currentPreview.result.entries} />
+            <p className="field-note">
+              A fresh .tbce/project.json is also created.
+            </p>
+            {currentPreview.result.conflicts.length > 0 && (
+              <div role="alert" className="stack-error">
+                <p>
+                  Resolve these path conflicts by editing the architecture or
+                  choosing a different stack or architecture:
+                </p>
+                <ul>
+                  {currentPreview.result.conflicts.map((c) => (
+                    <li key={c}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+        {currentPreview?.error && (
+          <p role="alert" className="stack-error">
+            {currentPreview.error}
+          </p>
+        )}
+        {!currentPreview && !catalog.error && (
+          <p role="status">Loading structure preview…</p>
+        )}
         {error && (
           <p className="stack-error" role="alert">
             {error}
@@ -184,7 +272,10 @@ export function NewProjectDialog({
           <button type="button" disabled={busy} onClick={onClose}>
             Cancel
           </button>
-          <button className="primary" disabled={busy || !fields.name.trim()}>
+          <button
+            className="primary"
+            disabled={busy || !ready || !fields.name.trim()}
+          >
             {busy ? 'Working…' : 'Choose location'}
           </button>
         </div>

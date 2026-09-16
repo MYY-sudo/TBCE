@@ -75,10 +75,14 @@ export const stackActions = {
       set({ stacks: get().stacks.filter((s) => s.id !== id) });
       return true;
     }),
-  create: (stackId: string | null, fields: ProjectFields) =>
+  create: (
+    stackId: string | null,
+    fields: ProjectFields,
+    architectureId: string | null = null,
+  ) =>
     perform(async () => {
       const created = await workspaceActions.replaceWorkspace((id) =>
-        templates.create(id, stackId, fields),
+        templates.create(id, stackId, fields, architectureId),
       );
       if (!created && useWorkspace.getState().error)
         set({ error: useWorkspace.getState().error });

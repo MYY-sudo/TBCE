@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { useProject } from '../stores/project';
+import { useGit } from '../stores/git';
 import { ProjectSettingsDialog } from '../projects/ProjectSettingsDialog';
 import { emptyFields, fieldsOf } from '../types/project';
+import { headLabel } from '../types/git';
 import type { FileEntry } from '../types/workspace';
 function Tree({ path, depth }: { path: string; depth: number }) {
   const entries = useWorkspace((s) => s.tree[path]);
@@ -89,6 +91,10 @@ export function Explorer() {
   const projectBusy = useProject((s) => s.busy);
   const [editing, setEditing] = useState(false);
   const project = detection.status === 'found' ? detection : null;
+  // Repository state comes from GitService, which actually runs Git.
+  const repository = useGit((s) =>
+    s.detection.status === 'found' ? s.detection.repository : null,
+  );
   // An unreadable manifest still exists on disk, so editing it repairs rather than converts.
   const mode = detection.status === 'none' ? 'convert' : 'settings';
   return (
@@ -129,10 +135,10 @@ export function Explorer() {
               <RefreshCw size={14} />
             </button>
           </div>
-          {project && (project.manifest.stack || project.hasGit) && (
+          {(project?.manifest.stack || repository) && (
             <div className="project-facts">
-              {project.manifest.stack && <span>{project.manifest.stack}</span>}
-              {project.hasGit && <span>Git repository</span>}
+              {project?.manifest.stack && <span>{project.manifest.stack}</span>}
+              {repository && <span>{headLabel(repository.head)}</span>}
             </div>
           )}
           {detection.status === 'invalid' && (

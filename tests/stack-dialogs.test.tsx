@@ -11,6 +11,12 @@ import { useStacks } from '../src/stores/stack';
 import { useWorkspace } from '../src/stores/workspace';
 import { useProject } from '../src/stores/project';
 import type { Stack, SourceEntry } from '../src/types/stack';
+import { architectures } from '../src/services/architecture';
+import { useArchitectures } from '../src/stores/architecture';
+
+vi.mock('../src/services/architecture', () => ({
+  architectures: { list: vi.fn(), preview: vi.fn() },
+}));
 
 vi.mock('../src/services/templates', () => ({
   templates: {
@@ -52,6 +58,15 @@ function entry(path: string, directory = false, selected = true): SourceEntry {
 }
 beforeEach(async () => {
   vi.resetAllMocks();
+  useArchitectures.setState(useArchitectures.getInitialState(), true);
+  vi.mocked(architectures.list).mockResolvedValue({
+    architectures: [],
+    warnings: [],
+  });
+  vi.mocked(architectures.preview).mockResolvedValue({
+    entries: [],
+    conflicts: [],
+  });
   useStacks.setState(useStacks.getInitialState(), true);
   vi.mocked(projects.detect).mockResolvedValue({ status: 'none' });
   useWorkspace.setState(
@@ -94,6 +109,11 @@ test('new project uses selected defaults, accepts overrides, and preserves its n
   fireEvent.change(screen.getByLabelText('Dev'), {
     target: { value: 'npm run start' },
   });
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Choose location' }),
+    ).toBeEnabled(),
+  );
   fireEvent.click(screen.getByRole('button', { name: 'Choose location' }));
   await waitFor(() =>
     expect(templates.create).toHaveBeenCalledWith(
@@ -103,6 +123,7 @@ test('new project uses selected defaults, accepts overrides, and preserves its n
         name: 'My project',
         commands: { dev: 'npm run start' },
       }),
+      null,
     ),
   );
 });

@@ -28,7 +28,6 @@ const manifest = (name: string): ProjectManifest => ({
 const project = (name: string): Project => ({
   manifest: manifest(name),
   path: 'C:/code/app',
-  hasGit: false,
 });
 beforeEach(() => {
   vi.resetAllMocks();
@@ -43,14 +42,13 @@ test('opening a workspace detects its project and records it as recent', async (
     status: 'found',
     manifest: manifest('Detected'),
     path: 'C:/code/app',
-    hasGit: true,
   });
   useWorkspace.setState({ workspace });
   await vi.waitFor(() =>
     expect(useProject.getState().detection.status).toBe('found'),
   );
   expect(projects.detect).toHaveBeenCalledWith('1');
-  expect(useProject.getState().project).toMatchObject({ hasGit: true });
+  expect(useProject.getState().project).toMatchObject({ path: 'C:/code/app' });
   expect(useProject.getState().recent[0]).toMatchObject({
     name: 'Detected',
     isProject: true,
@@ -93,7 +91,6 @@ test('reopening a recent project restores the workspace and its manifest', async
     status: 'found',
     manifest: manifest('Reopened'),
     path: 'C:/code/app',
-    hasGit: false,
   });
   await actions.openRecent('C:/code/app');
   expect(useWorkspace.getState().workspace).toEqual(workspace);
@@ -139,7 +136,6 @@ test('closing the workspace clears the detected project', async () => {
     status: 'found',
     manifest: manifest('Detected'),
     path: 'C:/code/app',
-    hasGit: false,
   });
   useWorkspace.setState({ workspace });
   await vi.waitFor(() =>

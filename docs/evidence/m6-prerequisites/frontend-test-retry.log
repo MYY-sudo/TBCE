@@ -1,0 +1,24 @@
+﻿
+> tbce@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/Users/mysf5/Masaüstü/TBCE
+
+
+ Test Files  9 passed (9)
+      Tests  66 passed (66)
+   Start at  21:05:51
+   Duration  14.32s (transform 3.37s, setup 28.93s, import 3.11s, tests 2.17s, environment 86.16s)
+
+npm.cmd : npm notice
+At line:2 char:1
++ & npm.cmd test *> .verification/m6-prerequisites/frontend-test-retry. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice New major version of npm available! 11.12.1 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice

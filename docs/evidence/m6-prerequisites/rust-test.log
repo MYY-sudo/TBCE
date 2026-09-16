@@ -1,0 +1,71 @@
+﻿cargo.exe : warn: could not canonicalize path C:\Users\mysf5
+At line:8 char:1
++ & cargo test --manifest-path src-tauri/Cargo.toml --locked *> .verifi ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warn: could not... C:\Users\mysf5:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.66s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\tbce_lib-09591ada211a24b0.exe)
+
+running 45 tests
+test filesystem::tests::accepts_turkish_names_without_locale_dependent_case_folding ... ok
+test architecture::tests::detects_file_directory_and_case_conflicts_in_stack_combination ... ok
+test process::tests::decodes_multibyte_output_split_across_reads ... ok
+test architecture::tests::rejects_unsafe_paths_duplicate_files_and_case_collisions ... ok
+test filesystem::tests::rejects_traversal_and_root_mutation ... ok
+test filesystem::tests::invalidates_old_workspace ... ok
+test project::tests::detects_nothing_in_a_plain_folder ... ok
+test filesystem::tests::rejects_line_endings_monaco_would_silently_normalize ... ok
+test filesystem::tests::failed_save_preserves_file ... ok
+test filesystem::tests::rejects_conflict_without_overwriting ... ok
+test project::tests::rejects_blank_names ... ok
+test project::tests::detection_keeps_the_existing_json_shape ... ok
+test project::tests::init_writes_a_manifest_that_detect_reads_back ... ok
+test project::tests::init_refuses_an_existing_project_and_update_refuses_a_missing_one ... ok
+test filesystem::tests::rejects_junctions ... ok
+test filesystem::tests::creates_lists_renames_and_rejects_collisions ... ok
+test architecture::tests::catalog_survives_restart_and_edit_keeps_id ... ok
+test architecture::tests::corrupt_future_and_mismatched_definitions_are_warned_and_skipped ... ok
+test filesystem::tests::round_trip_preserves_bom_unicode_and_crlf ... ok
+test filesystem::tests::rejects_binary_invalid_utf8_and_large_files ... ok
+test project::tests::reports_a_git_repository_without_running_git ... ok
+test project::tests::update_replaces_every_field ... ok
+test project::tests::reports_unreadable_manifests_instead_of_failing ... ok
+test templates::tests::collisions_invalid_names_and_missing_stacks_leave_destinations_untouched ... ok
+test terminal::tests::shell_cwd_converts_only_verbatim_drive_paths ... ok
+test templates::tests::corrupt_and_future_catalog_entries_are_skipped ... ok
+test templates::tests::corrupt_snapshot_fails_before_destination_is_created ... ok
+test architecture::tests::rejects_junctions_in_library_and_generation_paths ... ok
+test templates::tests::defaults_omit_metadata_and_deselect_dependencies_and_environment_files ... ok
+test templates::tests::explicit_selection_can_include_an_environment_file ... ok
+test templates::tests::junctions_are_blocked_in_sources_and_library_paths ... ok
+test project::tests::metadata_junctions_are_rejected_for_reads_and_writes ... ok
+test templates::tests::rejects_traversal_metadata_and_duplicate_selections_without_publishing ... ok
+test architecture::tests::merged_preview_and_creation_agree_and_conflicts_leave_no_destination ... ok
+test terminal::tests::restart_replaces_the_session_and_stop_all_clears_them ... ok
+test terminal::tests::runs_a_shell_inside_the_workspace_and_tracks_its_session ... ok
+test terminal::tests::shell_output_round_trips_turkish_characters ... ok
+test process::tests::accepts_input_and_stops_a_running_shell ... ok
+test templates::tests::failed_replacement_retains_the_published_snapshot ... ok
+test templates::tests::library_starts_empty_and_snapshot_survives_source_removal_and_restart ... ok
+test templates::tests::editing_details_does_not_change_snapshot_or_generated_project ... ok
+test architecture::tests::generates_empty_folders_text_and_fresh_metadata_independently ... ok
+test terminal::tests::canonical_workspace_is_used_on_start_and_restart ... ok
+test process::tests::spawns_inside_the_requested_directory ... ok
+test process::tests::streams_output_and_reports_the_exit_code ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running unittests src\main.rs (src-tauri\target\debug\deps\tbce-e3309e99f1b0a22e.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests tbce_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

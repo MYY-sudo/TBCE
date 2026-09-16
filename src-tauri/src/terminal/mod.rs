@@ -1,6 +1,6 @@
 use crate::{
     filesystem::{Result, ServiceError},
-    process::{Process, ProcessEvent, ProcessService},
+    process::{working_directory, Process, ProcessEvent, ProcessService},
 };
 use portable_pty::CommandBuilder;
 use serde::Serialize;
@@ -34,27 +34,6 @@ fn shell_name(program: &OsStr) -> String {
         || "shell".to_string(),
         |name| name.to_string_lossy().into_owned(),
     )
-}
-
-fn shell_working_directory(root: &Path) -> std::borrow::Cow<'_, Path> {
-    #[cfg(windows)]
-    {
-        use std::{
-            ffi::OsString,
-            os::windows::ffi::{OsStrExt, OsStringExt},
-            path::{Component, PathBuf, Prefix},
-        };
-        if matches!(
-            root.components().next(),
-            Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::VerbatimDisk(_))
-        ) {
-            // canonicalize adds \\?\ to local drive paths, but CMD rejects that cwd.
-            // Strip only that prefix, preserving the remaining Windows path verbatim.
-            let path: Vec<u16> = root.as_os_str().encode_wide().skip(4).collect();
-            return std::borrow::Cow::Owned(PathBuf::from(OsString::from_wide(&path)));
-        }
-    }
-    std::borrow::Cow::Borrowed(root)
 }
 
 // ConPTY hands the shell the machine's OEM code page, which on most installations cannot represent
@@ -92,7 +71,7 @@ impl TerminalService {
         emit: impl Fn(TerminalEvent) + Clone + Send + 'static,
     ) -> Result<Terminal> {
         let (mut command, shell) = shell_command();
-        command.cwd(shell_working_directory(root).as_ref());
+        command.cwd(working_directory(root).as_ref());
         self.generation += 1;
         let id = self.generation.to_string();
         let session = id.clone();
@@ -169,32 +148,6 @@ mod tests {
     }
     fn wait_for_output(receiver: &Receiver<TerminalEvent>, needle: &str) -> bool {
         output_until(receiver, needle).contains(needle)
-    }
-    #[cfg(windows)]
-    #[test]
-    fn shell_cwd_converts_only_verbatim_drive_paths() {
-        for (input, expected) in [
-            (
-                r"\\?\C:\Users\Masaüstü\yeni proje",
-                r"C:\Users\Masaüstü\yeni proje",
-            ),
-            (r"\\?\C:\", r"C:\"),
-            (
-                r"C:\Users\Masaüstü\yeni proje",
-                r"C:\Users\Masaüstü\yeni proje",
-            ),
-            (r"\\server\share\folder", r"\\server\share\folder"),
-            (
-                r"\\?\UNC\server\share\folder",
-                r"\\?\UNC\server\share\folder",
-            ),
-            (r"\\.\C:\folder", r"\\.\C:\folder"),
-        ] {
-            assert_eq!(
-                shell_working_directory(Path::new(input)).as_os_str(),
-                OsStr::new(expected)
-            );
-        }
     }
     #[cfg(windows)]
     #[test]
