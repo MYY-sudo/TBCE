@@ -460,6 +460,20 @@ UI code must not directly execute Git commands.
 
 #### Milestone 7 — Source control panel
 
+Execution tracking: [Milestone 7 checklist](milestone-7.md).
+
+**Delivered September 16, 2026** as a source-control panel in the activity bar over
+a Zustand store and the existing typed adapter. No Rust command was added or changed.
+Two scope decisions were confirmed before implementation: the panel shows the
+backend's unified patch read-only in Monaco rather than a Monaco diff editor, because
+the backend answers with a patch and not two file versions; and the panel covers all
+eighteen Git commands, including remote operations, paged history and the
+initialize/clone entry points, rather than only the example below. Under the same
+waiver used for Milestones 4, 5 and 6, this milestone is covered by automated tests
+but is **not desktop-accepted**; installed-app checks 57-66 wait in the
+[manual run-sheet](acceptance-runsheet-m6.md) and the Milestone 6 gate items P10-P12
+stay open. See the [verification record](verification.md).
+
 Create a visual Git panel. Example:
 
 ```text
@@ -486,7 +500,11 @@ feature/auth
 fix/navbar
 ```
 
-Use Monaco Diff Editor for diffs where practical.
+Use Monaco Diff Editor for diffs where practical. It was not practical here: the
+backend's `getDiff()` returns a unified patch, which Monaco renders read-only with
+`diff` highlighting while keeping Git's own rename, binary and truncation reporting.
+A side-by-side editor would need a nineteenth backend command returning both file
+versions, which belongs to a later milestone if it is wanted at all.
 
 ### Phase 9 — GitHub
 

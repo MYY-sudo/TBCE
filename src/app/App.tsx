@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Check,
@@ -14,10 +14,12 @@ import {
   AlertTriangle,
   Layers,
   Blocks,
+  GitBranch,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { actions as terminalActions, useTerminal } from '../stores/terminal';
 import { actions as projectActions, useProject } from '../stores/project';
+import { actions as gitActions, useGit } from '../stores/git';
 import { useDialog } from '../stores/dialog';
 import { Dialog } from '../components/Dialog';
 import { Explorer } from '../explorer/Explorer';
@@ -26,7 +28,9 @@ import { guardWindowClose } from '../services/window';
 import { StacksPanel } from '../templates/StacksPanel';
 import { NewProjectDialog } from '../templates/StackDialogs';
 import { ArchitecturesPanel } from '../architecture/ArchitecturesPanel';
+import { SourceControlPanel } from '../git/SourceControlPanel';
 const Editor = lazy(() => import('../editor/Editor'));
+const DiffView = lazy(() => import('../git/DiffView'));
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 // Development only. Vite substitutes this flag with a literal false in a production build, so the
 // branch and its dynamic import are removed and no Git harness chunk is ever emitted.
@@ -40,14 +44,19 @@ export function App() {
   const recent = useProject((s) => s.recent);
   const projectBusy = useProject((s) => s.busy);
   const projectError = useProject((s) => s.error);
+  const diff = useGit((s) => s.selected);
   const [sidebar, setSidebar] = useState(true);
-  const [panel, setPanel] = useState<'explorer' | 'stacks' | 'architectures'>(
-    'explorer',
-  );
+  const [panel, setPanel] = useState<
+    'explorer' | 'git' | 'stacks' | 'architectures'
+  >('explorer');
   const [newProject, setNewProject] = useState(false);
   const [width, setWidth] = useState(252);
   const [dock, setDock] = useState(248);
   const active = state.tabs.find((t) => t.id === state.activeId);
+  // The focus listener is installed once, so it reads the visible panel through a ref instead of
+  // capturing it. Git is refreshed only while its panel is on screen.
+  const visible = useRef(panel);
+  visible.current = panel;
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -75,6 +84,7 @@ export function App() {
     };
     const focus = () => {
       void actions.checkExternal();
+      if (visible.current === 'git') void gitActions.refresh();
     };
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (useWorkspace.getState().tabs.some(isDirty)) {
@@ -163,6 +173,17 @@ export function App() {
             <Files size={21} />
           </button>
           <button
+            title="Source control"
+            aria-label="Source control"
+            className={panel === 'git' && sidebar ? 'activity-active' : ''}
+            onClick={() => {
+              setSidebar(panel !== 'git' || !sidebar);
+              setPanel('git');
+            }}
+          >
+            <GitBranch size={20} />
+          </button>
+          <button
             title="Stacks"
             aria-label="Stacks"
             className={panel === 'stacks' && sidebar ? 'activity-active' : ''}
@@ -202,6 +223,8 @@ export function App() {
             <div style={{ width, flexShrink: 0 }}>
               {panel === 'explorer' ? (
                 <Explorer />
+              ) : panel === 'git' ? (
+                <SourceControlPanel />
               ) : panel === 'stacks' ? (
                 <StacksPanel />
               ) : (
@@ -303,8 +326,10 @@ export function App() {
               )}
             </div>
           )}
-          {active ? (
-            <>
+          {/* The editor is hidden rather than unmounted while a diff is open. Unmounting it
+              disposes Monaco's models, which would cost every tab its undo history. */}
+          {active && (
+            <div className="editor-stack" hidden={!!diff}>
               <div className="breadcrumbs">
                 <span>{state.workspace?.name}</span>
                 <span>/</span>
@@ -315,8 +340,14 @@ export function App() {
               >
                 <Editor />
               </Suspense>
-            </>
-          ) : (
+            </div>
+          )}
+          {diff && (
+            <Suspense fallback={<div className="loading">Loading diff…</div>}>
+              <DiffView />
+            </Suspense>
+          )}
+          {!active && !diff && (
             <div className="welcome">
               <div className="welcome-inner">
                 <span className="eyebrow">

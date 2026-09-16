@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 6: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, and the local Git backend. Desktop acceptance for the terminal, project system, stacks, architectures, and Git remains pending; see the verification record.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 7: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, and the source-control panel over it. Desktop acceptance for the terminal, project system, stacks, architectures, and Git remains pending; see the verification record.
 
 ## Available now
 
@@ -21,8 +21,9 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - Combine an architecture with a blank project or saved stack, preview the structure, and block conflicting paths before creation.
 - Read real repository state: branch, upstream, ahead/behind, staged and unstaged changes, untracked files, conflicts, branches, history, and diffs.
 - Initialize and clone repositories, create and switch branches, stage and unstage, commit, and exchange commits with a remote.
+- Do all of it from a source-control panel: review changes, stage them, write a commit, switch branches, fetch, pull, push, read paged history, and preview any change as a patch.
 
-The visual source-control panel, GitHub integration, running project commands, and the rest of V1 remain for later milestones. The Git backend currently surfaces only as a branch label in the explorer; Milestone 7 builds its interface.
+GitHub integration, running project commands, and the rest of V1 remain for later milestones.
 
 ## Projects
 
@@ -60,6 +61,18 @@ HEAD is detached. Opening a folder **inside** a repository is not enough: TBCE r
 where the repository is and asks you to open its root, because status for a
 subdirectory would describe paths relative to a folder you did not open.
 
+Open **Source control** in the activity bar for the rest. A plain folder offers to
+initialize or clone a repository; neither happens on its own. A repository shows its
+branch, upstream and ahead/behind counts, its staged and changed files in separate
+lists, a commit box, its local branches, and its history a page at a time. Select any
+changed file to read its patch in the editor area; your open tabs stay where they are,
+and closing the patch returns to them.
+
+Nothing polls. The panel reads the repository when you open it, when you save or open
+a file, when the window regains focus, after anything you do in it, and when you press
+Refresh. Close the panel and TBCE stops running Git entirely. A change made outside TBCE
+appears on the next focus or refresh, not the instant it happens.
+
 Available operations are initialize, clone, status, branches, create branch, switch
 branch, delete branch, stage, unstage, commit, fetch, pull, push, history, and diff.
 Creating a branch does not switch to it. Switching is refused while the index or
@@ -71,6 +84,10 @@ merely edited, and never saves or discards your editor buffers.
 Pull is fast-forward only: if your branch and the remote have diverged, TBCE reports it
 rather than merging or rebasing. Push is never forced. Merge and rebase workflows, force
 push, hard reset, stash, and tags are deferred.
+
+Staging works per file and for everything at once; a file cannot yet be staged in
+pieces, and commits cannot be amended. The panel lists your local branches; remote
+branches wait for GitHub integration.
 
 Credentials are your own. TBCE uses the credential helpers and SSH keys Git is already
 configured with, and never writes global or system Git configuration. Interactive
@@ -133,9 +150,10 @@ Rust confines editing and snapshot source reads to the selected workspace, saved
 
 - [Full product vision and V1/V2 roadmap](docs/roadmap.md)
 - [Milestone 6 delivery checklist and prerequisite gate](docs/milestone-6.md)
+- [Milestone 7 delivery checklist](docs/milestone-7.md)
 - [Architecture and native interfaces](docs/architecture.md)
 - [Windows acceptance checklist](docs/acceptance.md)
-- [Manual acceptance run-sheet for checks 15-42](docs/acceptance-runsheet-m6.md)
+- [Manual acceptance run-sheet for checks 15-42 and 57-66](docs/acceptance-runsheet-m6.md)
 - [Verification results](docs/verification.md)
 - [Remaining work](docs/remaining-work.md)
 

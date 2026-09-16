@@ -51,27 +51,38 @@
 ## Within the Git backend
 
 - Merge and rebase workflows, force push, hard reset, stash, tags, submodules, and Git LFS are all deferred. Pull is fast-forward only, so a divergence is reported rather than resolved.
-- Build the visual source-control panel in Milestone 7. The backend is complete but only a branch label and a development-only harness consume it.
+- The visual source-control panel exists as of Milestone 7 and reaches all eighteen commands. The development harness remains as a development tool, no longer as the only way to run a Git command.
 - Test authenticated remotes. Fetch, pull and push are proven against a local bare repository, so credential-helper and SSH-agent paths are unexercised. A passphrase-protected key with no agent has nothing to prompt and will run to the 300-second network deadline before being reported as a timeout.
 - Consider progress reporting and cancellation for clone, fetch and push. They currently block until they finish or the deadline passes.
 - Consider choosing among several remotes. Operations use the branch upstream, the single configured remote, or `origin`.
 - Test other operating systems. Only Windows has been exercised.
 - Decide how conflicted files should be resolved inside TBCE. They are reported, and committing is refused until they are resolved elsewhere.
 
+## Within the source control panel
+
+- Complete installed-app acceptance checks 57-66: initialization and cloning through the panel, staging and committing confirmed on disk, branch operations with their native confirmation, remote operations against a real remote, the diff preview, and layout at the minimum window size.
+- Add partial and hunk-level staging. Staging works per file and for everything; a file cannot be committed in pieces.
+- Add commit amending, and decide how a conflicted file should be resolved inside TBCE. Both are refused by the backend today, so both need backend work first.
+- Show remote branches. `git_branches` returns them and the store keeps them; the panel lists only local branches, which is enough until Milestone 8 gives remotes somewhere to belong.
+- Reconsider refreshing on window focus once a file watcher exists. Nothing polls, so a change made outside TBCE appears on the next focus or on Refresh, not immediately.
+- Consider progress and cancellation in the panel for clone, fetch and push. They show a busy state and block other Git operations until the backend deadline passes.
+- Translate the panel with the rest of the interface in Milestone 14. Its strings are English and inlined, like every other component.
+
 ## Product roadmap
 
 The [Milestone 6 delivery checklist](milestone-6.md) records the delivered backend
-against its evidence. G01-G11 and V01-V05 are complete; the prerequisite gate items
-P10-P12 are not. Desktop discovery still fails with a missing native pipe, so under
-the September 16, 2026 scope decision the backend was implemented while a
-[manual run-sheet](acceptance-runsheet-m6.md) was prepared for installed-app checks
-15-42. Automated tests prove the backend and prove nothing about the packaged
+against its evidence. G01-G11 and V01-V06 are complete; the prerequisite gate items
+P10-P12 are not. The [Milestone 7 checklist](milestone-7.md) records the panel over
+it. Desktop discovery still fails with a missing native pipe, so under the
+September 16, 2026 scope decision both the backend and its interface were built while
+a [manual run-sheet](acceptance-runsheet-m6.md) was prepared for installed-app checks
+15-42 and 57-66. Automated tests prove the code and prove nothing about the packaged
 application. Complete the run-sheet before treating any of this as desktop-verified.
 
 See the [full product vision and V1/V2 roadmap](roadmap.md) for every milestone, completion criteria, and security requirement.
 
-Milestone 5's personal architectures and Milestone 6's Git backend are implemented with automated coverage; desktop acceptance remains pending alongside earlier milestones. Next: the Git UI, GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
+Milestone 5's personal architectures, Milestone 6's Git backend and Milestone 7's source-control panel are implemented with automated coverage; desktop acceptance remains pending alongside earlier milestones. Next: GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
 
-Desktop acceptance checks 15-27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28-35 and the new Git checks 43-56. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
+Desktop acceptance checks 15-27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28-35 and the Git UI checks 57-66. Checks 43-56 targeted the backend through the development harness; the panel now covers the same ground through the real interface, so 57-66 replace them. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
 
 The current implementation does not claim V1 completion. Advanced automation remains outside the foundation/editor scope.

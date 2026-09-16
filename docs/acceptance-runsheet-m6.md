@@ -1,9 +1,14 @@
-# Manual acceptance run-sheet — installed-app checks 15–42
+# Manual acceptance run-sheet — installed-app checks 15–42 and 57–66
 
 Written for the person running TBCE on Windows. Desktop automation is unavailable
-in this environment, so these checks must be performed by hand. They are the
+in this environment, so these checks must be performed by hand. Checks 15–42 are the
 [Milestone 6 prerequisite gate](milestone-6.md) items P10 and P11, which stay
-unchecked until this sheet comes back filled in.
+unchecked until this sheet comes back filled in. Checks 57–66 cover the Milestone 7
+source-control panel and were added on September 16, 2026.
+
+Checks 43–56 exercised the Git backend through the development harness. The
+[source-control panel](milestone-7.md) now reaches every Git command, so run 57–66
+instead; they cover the same ground through the interface a user actually has.
 
 ## Before you start
 

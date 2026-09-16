@@ -1,6 +1,6 @@
 # Architecture
 
-TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, and the local Git backend. The visual source-control panel, GitHub integration, and a database remain deferred.
+TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, and the source-control panel over it. GitHub integration and a database remain deferred.
 
 ## Boundaries
 
@@ -32,7 +32,7 @@ xterm.js view
 ```
 
 ```text
-explorer label / development harness
+source control panel / explorer label
   → git store actions
   → typed GitService adapter
   → Tauri commands
@@ -130,7 +130,7 @@ Closing the window terminates every session. Replacing the workspace stops the r
 ## Git backend
 
 ```text
-explorer label / development harness
+source control panel / explorer label
   → git store actions
   → typed GitService adapter
   → Tauri commands
@@ -250,8 +250,70 @@ no editor buffer is ever saved or discarded on the user's behalf.
 ### What is deliberately absent
 
 Pull is fast-forward only. Merge and rebase workflows, force push, hard reset, stash,
-tags, submodules and the visual source-control panel are outside this milestone. Deleting
-a branch uses `-d` and never `-D`, so Git itself refuses unmerged work.
+tags and submodules remain absent. Deleting a branch uses `-d` and never `-D`, so Git
+itself refuses unmerged work.
+
+## Source control panel
+
+```text
+source control panel / diff preview
+  → git store actions
+  → typed GitService adapter
+  → the eighteen Git commands above
+```
+
+Milestone 7 adds an interface and nothing else: no Rust source changed, and the Rust
+test count is the same before and after. The panel is one more activity-bar panel
+beside the explorer, stacks and architectures.
+
+### What the store holds
+
+A single Zustand store owns detection, the last status, the branch list, a page of
+history, the per-file diff summaries, the open preview and the commit message draft.
+Components read that store and call its actions; none of them invokes a command.
+
+Two rules carry over from the services below it. Every read and mutation is numbered
+and checked against the open workspace, so an answer that arrives after the user
+opened a different folder is discarded rather than displayed. A second operation
+started while one runs is refused rather than queued, because the backend serializes
+repository access anyway and a queue would only hide the wait behind a growing backlog.
+
+Mutations return a fresh status, which is written straight into the store instead of
+being followed by another status call. Staging stops there, because moving content
+between the index and the working tree cannot change which branches exist or what has
+been committed. Commit, checkout, branch deletion, fetch, pull and push reread
+everything, because each of them can.
+
+### When Git runs
+
+Never on its own schedule. Detection runs when a workspace opens, which is what the
+explorer's branch label needs and is the only Git the project system waits on — and
+it waits on none, because `detect_project` still runs no Git at all. Everything else
+runs only while the panel is on screen: when it appears, when the set of file
+revisions the editor holds changes, when the window regains focus, after a mutation,
+and on the explicit Refresh control. Saving is what that revision rule is for; opening
+a file changes the set too and refreshes as well, which is a harmless extra read rather
+than a separate trigger worth its own code. Closing the panel stops all of it. There is no file watcher and no
+poll, so a change made outside TBCE appears on the next focus or refresh.
+
+### The diff preview
+
+The backend answers `git_diff` with a unified patch rather than two file versions, so
+the preview is that patch shown read-only in Monaco with `diff` highlighting. A
+side-by-side Monaco diff editor would need a nineteenth command returning the original
+and modified contents; the patch keeps Git's own rename, binary and truncation
+reporting, which a reconstructed side-by-side view would lose. The preview opens in
+the editor area, because the sidebar is too narrow to read a patch in. The editor is
+hidden rather than unmounted while it is open: unmounting runs Monaco's cleanup, which
+disposes every model and would cost each tab its undo history. Closing the preview
+returns to exactly what was being edited.
+
+### What the panel does not add
+
+Partial or hunk-level staging, commit amending, merge and rebase workflows, force
+push, hard reset, stash, tags and remote-branch management are all absent, because the
+backend does not implement them and this milestone added no backend. Branch deletion
+still asks for native confirmation in Rust rather than in the webview.
 
 ## Editing and failure behavior
 

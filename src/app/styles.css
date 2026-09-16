@@ -356,6 +356,16 @@ input:focus-visible,
   flex: 1;
   min-height: 0;
 }
+/* The editor keeps its Monaco models while a diff is shown, so it is hidden, not removed. */
+.editor-stack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editor-stack[hidden] {
+  display: none;
+}
 .terminal-dock {
   display: flex;
   flex-direction: column;
@@ -901,6 +911,183 @@ kbd {
   padding: 12px;
   margin: 12px 0;
   min-width: 0;
+}
+
+.scm-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 9px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scm-content > p {
+  margin: 2px 4px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.scm-content > button {
+  justify-content: center;
+  white-space: normal;
+}
+.scm-branch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  background: #23272e;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.scm-branch-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.scm-branch-name svg {
+  flex-shrink: 0;
+  color: #8f9d8a;
+}
+.scm-upstream {
+  color: #6d7683;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.scm-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  color: #9fb3c8;
+}
+.scm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.scm-actions button {
+  font-size: 11px;
+  gap: 5px;
+}
+.scm-section {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 1.1px;
+  color: #a7aeb8;
+  border-bottom: 1px solid #2b3037;
+  padding-bottom: 6px;
+}
+.scm-section svg {
+  color: #e2c49b;
+}
+.scm-section > span {
+  color: #606875;
+  letter-spacing: 0;
+}
+.scm-section > button {
+  margin-left: auto;
+  padding: 2px;
+}
+.scm-row {
+  display: flex;
+  align-items: center;
+}
+.scm-row .tree-row {
+  min-width: 0;
+  gap: 7px;
+  border-radius: 4px;
+}
+.scm-row .icon-button {
+  flex-shrink: 0;
+  padding: 5px;
+  color: #8d96a3;
+}
+.scm-mark {
+  flex-shrink: 0;
+  width: 13px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: #8f9d8a;
+}
+.scm-folder,
+.scm-stat {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 10px;
+  color: #6d7683;
+  white-space: nowrap;
+}
+.scm-folder {
+  margin-left: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.scm-stat {
+  display: inline-flex;
+  gap: 5px;
+}
+.scm-added {
+  color: #8faf7e;
+}
+.scm-removed {
+  color: #d08d86;
+}
+.scm-empty {
+  color: #6d7683;
+  font-size: 11px;
+}
+.scm-message {
+  margin-top: 6px;
+}
+.scm-message textarea {
+  min-height: 62px;
+}
+.scm-commit {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 6px 5px;
+  border-bottom: 1px solid #23272e;
+}
+.scm-oid {
+  font-family: 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  color: #8baeca;
+}
+.scm-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.scm-meta {
+  grid-column: 2;
+  font-size: 10px;
+  color: #6d7683;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diff-heading {
+  gap: 8px;
+}
+.diff-spacer {
+  flex: 1;
+}
+.diff-counts {
+  display: inline-flex;
+  gap: 7px;
+  font-size: 11px;
 }
 
 /* Development-only Git harness. Removed from production builds with its component. */

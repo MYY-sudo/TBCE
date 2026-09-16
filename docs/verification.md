@@ -316,6 +316,125 @@ installer was **not** installed or exercised in this session.
   and be reported as a timeout.
 - Installer upgrade and uninstall, signing, and release ownership.
 
+## Milestone 7 — source control panel, September 16, 2026
+
+The source-control panel is implemented and covered by automated tests.
+**This is not desktop acceptance.** No installed-app scenario has run in this
+session; Milestone 6 gate items P10, P11 and P12 remain open, and the new checks
+57-66 are added to the [manual run-sheet](acceptance-runsheet-m6.md) unexecuted.
+
+### Scope decisions
+
+Both were confirmed by the user before implementation and are recorded in the
+[delivery checklist](milestone-7.md).
+
+1. The preview shows the backend's unified patch read-only in Monaco with `diff`
+   highlighting rather than a Monaco diff editor, because `git_diff` answers with a
+   patch and not with two file versions. A side-by-side view would have required a
+   nineteenth backend command inside a milestone whose scope is the interface.
+2. The panel covers all eighteen Git commands — remote operations, paged history and
+   the initialize/clone entry points included — rather than only the roadmap's minimal
+   example, so the acceptance checks no longer depend on the development harness.
+
+### Desktop acceptance waiver
+
+Desktop automation is still unavailable; the missing Computer Use native pipe recorded
+on September 15 was not resolved, and no attempt was made to work around it in this
+session. The user directed that Milestone 7 proceed under the same waiver applied to
+Milestones 4, 5 and 6. No desktop checkbox was ticked anywhere on the strength of this
+work.
+
+### Automated verification
+
+Every command below exited 0. Raw output:
+[automated checks](evidence/m7-git-ui/automated-checks.log).
+
+| Check                                       | Before | After | Result |
+| ------------------------------------------- | ------ | ----- | ------ |
+| `npm run format:check`                      | —      | —     | Pass   |
+| `npm run lint`                              | —      | —     | Pass   |
+| `npx tsc -b`                                | —      | —     | Pass   |
+| `npm test`                                  | 73     | 111   | Pass   |
+| `cargo fmt --check`                         | —      | —     | Pass   |
+| `cargo clippy --all-targets -- -D warnings` | —      | —     | Pass   |
+| `cargo test --locked`                       | 81     | 81    | Pass   |
+
+Thirty-eight new frontend tests and no new Rust tests. The Rust count is deliberately
+unchanged: this milestone added no Rust source, so its Rust suite is a regression
+guard rather than new proof. Environment: Git 2.54.0.windows.1, Node 24.15.0,
+npm 11.12.1, Cargo 1.96.0, Windows.
+[Source manifest](evidence/m7-git-ui/source-manifest.txt) fingerprints the tested
+tracked and untracked sources, excluding `docs/` and `README.md`. Manifest SHA-256:
+`091410EA4446847FDF7F375974E80935B624BEAFECA547FAA2979604D54E0210`.
+
+### What the new tests actually assert
+
+Sixteen store tests, nineteen panel tests and three shell tests, against a mocked adapter. The ones worth
+naming, because they encode decisions rather than restating the code:
+
+- Detection alone runs no `git_status`, `git_branches` or `git_history`, so opening a
+  folder still never waits on the repository.
+- A status answer that arrives after the user opened a different folder is discarded,
+  and the store keeps its null status rather than showing the previous folder's state.
+- A second operation started while one runs is refused and never reaches the adapter.
+- Staging writes the status the backend returned and does **not** reread branches or
+  history, which is asserted by clearing those mocks and requiring zero calls.
+- A commit refused for a missing identity keeps the typed message. Losing a written
+  commit message because Git refused the commit would be its own failure.
+- A cancelled branch deletion — the backend answering false after a cancelled native
+  confirmation — leaves the branch list untouched and rereads nothing.
+- Pushing a branch with no upstream passes `setUpstream: true`; a tracked branch
+  passes false.
+- A preview whose file no longer differs after staging is dropped silently rather than
+  surfaced as an error.
+- Each of the four detection states renders its own panel, and both the parent-repository
+  and no-folder states are asserted to run no Git at all.
+- Opening a diff hides the editor rather than unmounting it, asserted by requiring the
+  editor to stay in the document while not visible.
+
+### Production bundle
+
+The development-only harness is still excluded, rechecked against the new bundle:
+[bundle exclusion](evidence/m7-git-ui/production-bundle-exclusion.txt). The panel ships
+in the main entry chunk and the diff preview as its own 1.8 KB lazy chunk.
+
+### Packaging
+
+`npm run tauri build -- --target x86_64-pc-windows-msvc` exited 0. Installer:
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`,
+SHA-256 `50E57BE3C2BE06DE7D99185C1A7E4588CDFBE26B81618B7C7E489A2C9A539C93`. It was
+built from a clean `dist` after the final correction, and was **not** installed or
+exercised in this session.
+
+### Corrections made during this work
+
+1. The first version of the shell wiring rendered the diff preview **instead of** the
+   editor. That unmounts the editor, and its cleanup disposes every Monaco model, so
+   opening a diff would have silently cost every open tab its undo history. The editor
+   is now hidden rather than removed, and a test asserts that it stays in the document
+   while not visible. This was found by reading the editor's cleanup, not by a failing
+   test, and the claim that open tabs are untouched would otherwise have been wrong.
+2. A first draft asserted that history paging called the adapter with an explicit
+   `null` path. The adapter defaults that argument, so the mock recorded three
+   arguments rather than four. The assertion was corrected; the code was not, because
+   the adapter's default is the intended contract.
+3. A panel test asserted a single element with the branch name. The branch names both
+   the header and the branch list, so the assertion was corrected to expect both
+   rather than the panel being changed to show it once.
+
+### Not verified
+
+- Installed-app behaviour of anything in this milestone. No Git operation has been
+  performed through the packaged application, and no panel has been rendered in
+  WebView2. jsdom tests do not substitute for that.
+- Acceptance checks 15-42 and the new Git UI checks 57-66.
+- Layout at 1280 × 820 and at the minimum 800 × 540 window size. No screenshot or
+  rendering check was possible.
+- Native picker and native confirmation behaviour for clone and branch deletion.
+- Real network remotes, authenticated HTTPS and SSH, which the backend record already
+  lists as unexercised.
+- Operating systems other than Windows.
+
 ## Build notes
 
 Vite reports a large lazy Monaco chunk, expected for the bundled editor and language support. Tauri warns that the requested `com.tbce.app` identifier ends in `.app`; it is retained as specified, with macOS packaging deferred. Initial sandbox path-access errors were resolved by running build tools with the required filesystem access.

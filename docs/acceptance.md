@@ -71,6 +71,24 @@ outside TBCE.
 
 Record the checks actually performed in `verification.md`; distinguish automated service tests from installed-app UI checks.
 
+## Git UI — installed-app checks
+
+These exercise the Milestone 7 source-control panel in the packaged application.
+The development harness is no longer needed: every Git command is reachable from
+the panel. Work in disposable repositories with spaces and Turkish characters in
+their paths, and confirm every result with the `git` command line outside TBCE.
+
+57. Open a plain folder and choose Source control. Confirm the panel offers to initialize or clone, and that neither runs on its own. Initialize with a named first branch, then confirm outside TBCE that the repository exists on that branch and that the panel and the explorer label agree. Open a subdirectory of a repository and confirm the panel explains that the repository is above it and offers no operations.
+58. Rename `git.exe` out of the way or edit `PATH`, then reopen a repository. Confirm the panel explains that Git is unavailable, that the folder still opens, and that editing and saving still work.
+59. With staged and unstaged edits to the same file, plus a rename, a deletion, an untracked file and a file with Turkish characters in its name, confirm both lists match `git status --porcelain=v2` and that the added/removed counts match `git diff --numstat`.
+60. Stage individual paths, stage everything including a deletion, and unstage. After unstaging, compare the working file outside TBCE and confirm it is byte-identical. Repeat before the first commit in a new repository.
+61. Try to commit with an empty message and with nothing staged; confirm the button stays disabled. Unset `user.email`, stage something, and confirm the commit is refused with an explanation, that no commit is created, and that the typed message survives. Set an identity, commit, and confirm `git show` outside TBCE matches what was staged rather than later edits.
+62. Create a merge conflict outside TBCE. Confirm the conflicted file is listed, that committing is refused with an explanation, and that committing becomes possible only after the conflict is resolved and staged.
+63. Create a branch and confirm the current branch does not change. Switch branches with a clean tree, then make an edit and confirm switching is refused with the edit intact. Delete a merged branch: confirm the native prompt appears, that cancelling preserves the branch, and that confirming removes it. Confirm the current branch cannot be deleted from the panel.
+64. Using a local bare repository as a remote and two clones, fetch, pull and push from the panel. Confirm ahead and behind counts change as expected and are blank rather than zero when a branch has no upstream. Confirm pushing an unpublished branch sets its upstream. Make the clones diverge, then confirm pull and push are both refused and the bare repository is unchanged.
+65. Clone from a local path through the panel: name the folder, choose the parent in the native picker, and confirm the reported location. Confirm cancelling either prompt or the picker creates nothing, that an existing destination name is refused with its contents intact, and that the open workspace does not change. Attempt `ext::sh -c touch pwn`, a `git://` URL and an `http://` URL; each must be refused before anything runs.
+66. Select a text change, a staged change, a renamed file and a binary file, and confirm each preview: the patch is read-only, the rename shows both paths, and the binary file explains that there is nothing to show. Confirm opening a preview leaves open tabs and the active tab untouched and that closing it returns to the editor. Read history past one page with Load more, and confirm an unborn branch reports an empty history. Check keyboard navigation, busy-state controls and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming every panel action stays reachable.
+
 ## Milestone 6 prerequisite evidence
 
 Checks 15-42 and the earlier editor gaps listed in the
