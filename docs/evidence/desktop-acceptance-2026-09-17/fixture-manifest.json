@@ -1,0 +1,52 @@
+﻿{
+    "date":  "2026-09-17T00:07:36.2009433+03:00",
+    "root":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç",
+    "purpose":  "Prepared disposable disk fixtures only; not evidence of any TBCE acceptance check",
+    "files":  [
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\desteklenmeyen dosyalar\\large.txt",
+                      "bytes":  10485761,
+                      "sha256":  "0C2725E0D4AE4AE669BDD6C88B253997198EFB67D962D217C52E6CBFD318FE0C"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\desteklenmeyen dosyalar\\mixed.txt",
+                      "bytes":  9,
+                      "sha256":  "271D4336749510CD46D1C71502107F3ED2D43D6B382665918DFE0225320706F6"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\desteklenmeyen dosyalar\\utf16.txt",
+                      "bytes":  28,
+                      "sha256":  "16DF43617E11937D9257D2E61B21688FF8DBA48C8B834B11E1678AD1F66F3426"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\kaynak örnek\\.env",
+                      "bytes":  21,
+                      "sha256":  "A26E357C90365631951606AA4D4703F7CC84F947908B5769E60344143A1D2BEC"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\kaynak örnek\\.env.example",
+                      "bytes":  11,
+                      "sha256":  "FCC11AB58C9C8A947B46644F33F70638111FC882E0C69F13C9B75004B918322A"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\kaynak örnek\\asset.bin",
+                      "bytes":  7,
+                      "sha256":  "7BB6463B30F9E301FED333CDF8960CA9497B602CCD8EEB46AE42693FDEA15A4D"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\kaynak örnek\\crlf.txt",
+                      "bytes":  35,
+                      "sha256":  "23856204F5EFD54F292C409E59F12881C8B0324B6BA40B73772386F9BCF2D3DC"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\kaynak örnek\\package.json",
+                      "bytes":  44,
+                      "sha256":  "8233AEBE82A679E20205069D0F557F351460ECD506541C3C1B04E8CB100B8DD4"
+                  },
+                  {
+                      "path":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\Masaüstü deneme ğüşıöç\\kaynak örnek\\src\\örnek.txt",
+                      "bytes":  49,
+                      "sha256":  "8D7F4F7AE204ACD59B9AB15CC5E45C790F71E9AEAC975F70282BA17585A86DAC"
+                  }
+              ]
+}

@@ -11,8 +11,11 @@ use tauri_plugin_dialog::DialogExt;
 
 pub type Backend = Mutex<FileSystemService>;
 pub type Terminals = Mutex<TerminalService>;
-pub type Templates = Mutex<()>;
-pub type Git = Mutex<()>;
+// Tauri keys managed state by concrete type; aliases of Mutex<()> collide.
+#[derive(Default)]
+pub struct Templates(Mutex<()>);
+#[derive(Default)]
+pub struct Git(Mutex<()>);
 
 fn architecture_service(app: &AppHandle) -> Result<ArchitectureService> {
     ArchitectureService::new(
@@ -77,6 +80,7 @@ async fn template_task<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<Templates>();
         let _guard = state
+            .0
             .lock()
             .map_err(|_| ServiceError::new("INTERNAL", "Stack library is unavailable."))?;
         let root = app
@@ -192,6 +196,7 @@ async fn git_task<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<Git>();
         let _guard = state
+            .0
             .lock()
             .map_err(|_| ServiceError::new("INTERNAL", "Git service is unavailable."))?;
         let root = lock(&app.state::<Backend>())?.root_path(&workspace_id)?;
@@ -222,6 +227,7 @@ pub async fn git_clone_repository(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<Git>();
         let _guard = state
+            .0
             .lock()
             .map_err(|_| ServiceError::new("INTERNAL", "Git service is unavailable."))?;
         git::validate_remote(&source)?;

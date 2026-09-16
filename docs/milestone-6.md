@@ -33,7 +33,10 @@ Evidence: [September 15 verification](verification.md#milestone-6-prerequisite-a
 - [ ] P12: Resolve all prerequisite failures and confirm the gate passes.
 
 P10/P11 remain blocked: desktop discovery fails with a missing native pipe, including
-after resetting and reinitializing the JavaScript session. No desktop scenario has run.
+after resetting and reinitializing the JavaScript session. The
+[September 17 execution attempt](verification.md#installed-app-acceptance-attempt--september-17-2026)
+reproduced the failure outside Plan mode and generated a new installer. No desktop
+scenario ran in that attempt; P10, P11 and P12 remain unchecked.
 
 **September 16, 2026 scope decision.** The user directed that the Git backend be
 implemented while a manual acceptance path is prepared, rather than waiting for

@@ -435,6 +435,169 @@ exercised in this session.
   lists as unexercised.
 - Operating systems other than Windows.
 
+## Installed-app acceptance attempt — September 17, 2026
+
+**Blocked before any installed-app scenario.** The requested implementation was
+attempted in Default execution mode, after the planning turn. No check below
+passed or failed on product behavior; none could be exercised. P10, P11 and P12
+remain unchecked. Git UI checks 57–66 remain pending.
+
+### Build and environment
+
+- Source revision: `10b4ba84cf595e76d0f9d668abb201eb190d7ae8`; the working tree was
+  clean before this attempt. Application sources were not changed.
+- [Source manifest](evidence/desktop-acceptance-2026-09-17/source-manifest.txt),
+  excluding documentation and README: SHA-256
+  `77CB916D50C21064975480405E4E2743D4A66B9B2B1FF3648372CB4CA79F09B5`.
+- Windows NT 10.0.26220.0; TBCE 0.1.0; Git 2.54.0.windows.1;
+  Node 24.15.0; npm 11.12.1; Cargo 1.96.0.
+  [Environment capture](evidence/desktop-acceptance-2026-09-17/environment.txt).
+- `npm run tauri build -- --target x86_64-pc-windows-msvc` passed after rerunning
+  with the filesystem access required by Vite. The initial sandboxed attempt
+  failed while reading a parent directory.
+  [Build log](evidence/desktop-acceptance-2026-09-17/windows-package.log);
+  [initial failure](evidence/desktop-acceptance-2026-09-17/windows-package-sandbox-failure.log).
+- Installer: `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`;
+  SHA-256 `9DFC7C73091D69891327587E324B61DE8CB82FFADE5D570E9BA8BC7312E5CA33`.
+  [Package identity](evidence/desktop-acceptance-2026-09-17/package-identity.txt).
+  This package was **not installed or launched** in this attempt.
+
+### Desktop blocker and recovery
+
+Importing `@oai/sky` succeeded, but `sky.list_apps()` returned:
+
+```text
+Computer Use native pipe is unavailable: failed to connect native pipe: The system cannot find the file specified. (os error 2)
+```
+
+Resetting the JavaScript session, importing again and retrying discovery returned
+the same error. [B1: discovery record](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json)
+records that sequence and the final tool result. A separate
+[read-only pipe inspection](evidence/desktop-acceptance-2026-09-17/native-pipe-inspection.txt)
+found no matching Computer Use endpoint. This reproduced the blocker outside Plan
+mode. A stale configured endpoint or helper lifecycle problem remains a hypothesis,
+not a proven root cause. No Codex configuration or permissions were changed.
+
+The user was asked to check the Computer Use server/skill toggles and use Enable
+and Try now in the plugin screen, following the
+[official setup instructions](https://learn.chatgpt.com/docs/computer-use).
+The connection was not repaired during this attempt. Before resuming, require
+successful window discovery and an application screenshot, then install the
+identified package and run the scenarios through its UI. If the package changes,
+record the new hash and the checks exercised against it.
+
+### Prepared fixtures
+
+Disposable files under
+`.verification/desktop-acceptance-2026-09-17/Masaüstü deneme ğüşıöç` include
+Turkish UTF-8 text, BOM/CRLF, binary bytes, empty directories, capture exclusions
+and unsupported-file examples. The
+[fixture manifest](evidence/desktop-acceptance-2026-09-17/fixture-manifest.json)
+records their initial bytes and hashes. Local Git fixtures contain a bare remote
+and two working copies with disposable repository-local identities. Fixture
+preparation is not acceptance evidence. Existing personal catalogs and project
+data were not modified.
+
+### Run-sheet results
+
+Expected results below summarize [acceptance.md](acceptance.md); all substeps in
+that checklist still apply. B1 supports the common infrastructure blocker, not
+the expected application behavior. There are **45 blocked checks, 0 passes and
+0 product failures** in this attempt. Checks 2, 7, 9, 10 and 13 cover P11;
+11–12 retain the additional editor gaps; 15–42 cover P10; 57–66 cover Git UI.
+
+| Check | Expected                                                                                                                        | Observed                           | Evidence                                                            | Status  |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------- | ------- |
+| 2     | Native picker opens the folder; cancelling preserves the workspace.                                                             | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 7     | Cancel, Save and Discard preserve or persist edits correctly on tab close, workspace replacement and exit.                      | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 9     | Recycle Bin confirmation/cancellation, affected tabs and Windows restoration work.                                              | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 10    | Refresh reloads clean files; dirty conflicts support Cancel, Reload and explicit Overwrite.                                     | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 11    | Missing-file buffers survive; read-only save errors preserve edits.                                                             | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 12    | Unsupported files, invalid names and collisions produce actionable errors without data loss.                                    | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 13    | Resize, focus, Escape, explorer and status remain usable at minimum size.                                                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 15    | Both terminal entry points work; opening is disabled without a workspace.                                                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 16    | Terminal starts in the workspace and renders Turkish output correctly.                                                          | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 17    | Ctrl+C cancels an interactive command without killing the shell; colors render.                                                 | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 18    | Divider/window resizing rewraps terminal output.                                                                                | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 19    | Hidden-terminal output continues and scrollback survives.                                                                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 20    | Exit code appears; Restart opens a working shell in the same folder.                                                            | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 21    | Terminal Close and workspace replacement leave no orphan shell.                                                                 | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 22    | Application exit leaves no orphan shell.                                                                                        | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 23    | New project creates its folder/manifest and opens; duplicate names are refused.                                                 | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 24    | Folder conversion and edited project metadata match the disk manifest.                                                          | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 25    | Recent persists across restart and distinguishes projects from plain folders.                                                   | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 26    | Missing Recent folders show an error and their entries are removed.                                                             | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 27    | Invalid/future manifests report errors and can be repaired through settings.                                                    | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 28    | Empty stack catalog, inclusion defaults, metadata exclusions and selection counts behave correctly.                             | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 29    | Capture honors unsaved-buffer choices, save failures and externally changed-file refresh.                                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 30    | Saved stack survives restart/source removal and creates byte-correct projects without executing commands.                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 31    | Stack replacement preserves ID; cancellation/failure preserves old snapshots and existing projects.                             | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 32    | Stack deletion supports cancellation and Recycle Bin recovery without changing existing projects.                               | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 33    | Project creation failure/cancellation preserves dirty workspace and terminal; success retires it; submissions do not duplicate. | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 34    | Links are unavailable; damaged/future stacks warn without hiding healthy entries.                                               | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 35    | Stack dialogs support keyboard, busy states, long content and actions at both required window sizes.                            | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 36    | Architecture creation validates and preserves nested/empty folders, Turkish UTF-8 files and unsaved-change cancellation.        | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 37    | Architectures persist and retain IDs; damaged/future entries warn without hiding healthy ones.                                  | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 38    | Architecture-based creation produces literal content, empty folders and fresh metadata without executing commands.              | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 39    | Stack/architecture composition preserves compatible files and blocks path/case conflicts until corrected.                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 40    | Architecture defaults work; settings only change metadata; unavailable IDs remain explained.                                    | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 41    | Architecture deletion/recovery and creation cancellation/failure preserve projects, buffers and terminal as specified.          | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 42    | Architecture dialogs support keyboard, busy controls and reachable actions at both required window sizes.                       | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 57    | Source control explicitly initializes/clones; branch labels agree; parent-repository operations are refused.                    | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 58    | Missing Git is explained while folder opening, editing and saving remain usable.                                                | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 59    | Staged/unstaged lists, Unicode paths and counts match independent Git output.                                                   | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 60    | Individual/all staging and unstaging, including unborn branches, preserve working-file bytes.                                   | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 61    | Invalid commits are disabled/refused and retain the draft; valid commits contain staged bytes only.                             | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 62    | Conflicts block commits until resolved and staged.                                                                              | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 63    | Branch creation, clean checkout and confirmed deletion work; dirty checkout/current-branch deletion are refused.                | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 64    | Local-remote fetch/pull/push, publication and ahead/behind work; divergence refusals preserve remote refs.                      | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 65    | Native clone flow preserves workspace; cancellations/collisions/unsafe transports create nothing unwanted.                      | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+| 66    | Read-only text/staged/rename/binary previews preserve tabs; history pagination, empty history and layout work.                  | Not run; desktop discovery failed. | [B1](evidence/desktop-acceptance-2026-09-17/desktop-discovery.json) | blocked |
+
+The run-sheet group mapping was corrected and the Git UI group was added. Merely
+recording these blocked results does not satisfy P12 or establish desktop
+acceptance. The previous dated verification records remain unchanged.
+
+Documentation validation passed: Prettier on the three changed Markdown files,
+`git diff --check`, all new evidence links, the installer hash, the 45-check result
+set, and all 95 application-source fingerprints. The gate boxes remain unchecked.
+[Record validation](evidence/desktop-acceptance-2026-09-17/record-validation.txt).
+Application test suites were not rerun: no application source changed, and they
+would not resolve the desktop blocker.
+
+## Installed-app acceptance resumed — September 17, 2026, 00:16 +03:00
+
+Computer Use discovery and screenshot capture succeeded in the fresh session. The
+original installer hash and all 95 source fingerprints matched the previous record.
+The package was installed into the disposable acceptance directory.
+[Build and installation identity](evidence/desktop-acceptance-2026-09-17/resumed-001/identity.json).
+
+The original package **failed check 1**: it exited before creating a window.
+[Captured startup error](evidence/desktop-acceptance-2026-09-17/resumed-001/launch-stderr.txt)
+reported duplicate Tauri managed state for `Mutex<()>`. Both `Templates` and `Git`
+were aliases of that same concrete type. They now use separate newtypes; a regression
+test verifies that all managed service TypeIds are distinct.
+
+The 82 Rust tests and Clippy passed after the fix. Initial attempts to exercise a
+Tauri builder inside the unit-test executable failed at Windows loader startup
+(`STATUS_ENTRYPOINT_NOT_FOUND`); the final test checks the state-key invariant without
+requiring the native GUI runtime. These automated results do not establish desktop
+acceptance.
+[Rust results](evidence/desktop-acceptance-2026-09-17/resumed-001/rust-tests-final.log),
+[Clippy](evidence/desktop-acceptance-2026-09-17/resumed-001/clippy.log),
+[fixed source manifest](evidence/desktop-acceptance-2026-09-17/resumed-001/source-manifest-fixed.txt).
+
+The first Computer Use launch request timed out awaiting app approval. The retry
+returned successfully but opened the historical `.verification/installed/tbce.exe`,
+which was identified through its process path and closed. Its screenshot is not
+credited to the current package. Directly launching the newly installed executable
+exposed the startup panic above. Existing app data was backed up to the ignored
+acceptance directory; the two catalog directories were empty before testing.
+
+Execution is ongoing. Per-check Expected, Observed, Evidence and Status are recorded
+in [the current result ledger](evidence/desktop-acceptance-2026-09-17/resumed-001/results.json).
+P10/P11/P12 remain unchecked until their complete installed-app scenarios pass.
+
 ## Build notes
 
 Vite reports a large lazy Monaco chunk, expected for the bundled editor and language support. Tauri warns that the requested `com.tbce.app` identifier ends in `.app`; it is retained as specified, with macOS packaging deferred. Initial sandbox path-access errors were resolved by running build tools with the required filesystem access.

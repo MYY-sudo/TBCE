@@ -1,0 +1,8 @@
+﻿Date: 2026-09-17T00:06:52.6335806+03:00
+Build command: npm run tauri build -- --target x86_64-pc-windows-msvc
+Build exit code: 0
+Installer: C:\Users\mysf5\Masaüstü\TBCE\src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\TBCE_0.1.0_x64-setup.exe
+Bytes: 5227816
+SHA-256: 9DFC7C73091D69891327587E324B61DE8CB82FFADE5D570E9BA8BC7312E5CA33
+Installed during this run: no
+Installed-app acceptance: blocked before discovery; no scenario executed

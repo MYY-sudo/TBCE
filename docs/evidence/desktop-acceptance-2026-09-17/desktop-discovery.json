@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-17",
+  "timezone": "Europe/Istanbul",
+  "mode": "Default (execution)",
+  "sequence": [
+    "Initialize @oai/sky succeeded",
+    "sky.list_apps failed",
+    "Reset JavaScript session",
+    "Initialize @oai/sky succeeded",
+    "sky.list_apps failed"
+  ],
+  "lastToolResult": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Computer Use native pipe is unavailable: failed to connect native pipe: The system cannot find the file specified. (os error 2)"
+      }
+    ],
+    "isError": true
+  },
+  "installedAppScenariosExecuted": 0
+}

@@ -1,0 +1,6 @@
+PASS: 95 source fingerprints unchanged.
+PASS: exactly 45 distinct expected checks recorded as blocked.
+PASS: all new verification evidence links resolve.
+PASS: P10/P11/P12 remain unchecked.
+PASS: installer SHA-256 matches the verification record.
+These are documentation/build consistency checks, not installed-app acceptance.

@@ -1,0 +1,30 @@
+﻿{
+    "Time":  "2026-09-17T00:23:50.2359576+03:00",
+    "Revision":  "10b4ba84cf595e76d0f9d668abb201eb190d7ae8",
+    "SourceManifestEntries":  95,
+    "SourceManifestMismatches":  0,
+    "InstallerSHA256":  "9DFC7C73091D69891327587E324B61DE8CB82FFADE5D570E9BA8BC7312E5CA33",
+    "InstallerExit":  0,
+    "InstalledPath":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\installed\\tbce.exe",
+    "InstalledSHA256":  "BDA3F399D4217AF55DEBF8A284B442476E8C9298486E2D8E3CC287A4F3B6A310",
+    "ReleaseBytes":  14708736,
+    "InstalledBytes":  14708736,
+    "Differences":  [
+                        {
+                            "Offset":  11630840,
+                            "Release":  85,
+                            "Installed":  78
+                        },
+                        {
+                            "Offset":  11630841,
+                            "Release":  78,
+                            "Installed":  83
+                        },
+                        {
+                            "Offset":  11630842,
+                            "Release":  75,
+                            "Installed":  83
+                        }
+                    ],
+    "CatalogsInitiallyEmpty":  true
+}

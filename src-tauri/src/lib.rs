@@ -75,3 +75,26 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("could not run TBCE");
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn managed_services_have_distinct_state_keys() {
+        use super::commands::{Backend, Git, Templates, Terminals};
+        use std::any::TypeId;
+        // Tauri uses TypeId as its state key. A type alias does not make a new key
+        // and causes startup to panic, even when service tests pass in isolation.
+        let keys = [
+            TypeId::of::<Backend>(),
+            TypeId::of::<Terminals>(),
+            TypeId::of::<Templates>(),
+            TypeId::of::<Git>(),
+        ];
+        let unique: std::collections::HashSet<_> = keys.into_iter().collect();
+        assert_eq!(
+            unique.len(),
+            keys.len(),
+            "managed service state keys collide"
+        );
+    }
+}

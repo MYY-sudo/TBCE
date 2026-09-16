@@ -1,0 +1,4 @@
+﻿Date: 2026-09-17T00:06:52.7438183+03:00
+Inspection: read-only named-pipe enumeration
+Matching codex-computer-use pipes: 0
+Inference: native endpoint unavailable; stale configuration versus helper lifecycle cause not established. No host configuration edited.

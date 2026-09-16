@@ -1,0 +1,464 @@
+[
+  {
+    "check": 1,
+    "expected": "Install the generated NSIS package and launch TBCE without a Vite server running.",
+    "observed": "Original installer failed at startup. Fixed installer E199626746EA4E513E86A002DC33DA11BDE9A992BAAEC872956124402678946E installed and opened from its verified path; no development server used.",
+    "evidence": [
+      "identity-fixed.json",
+      "002-fixed-start.json",
+      "startup-defect.json"
+    ],
+    "status": "pass",
+    "time": "2026-09-16T21:36:06.162Z"
+  },
+  {
+    "check": 2,
+    "expected": "Open the folder using the native picker. Cancel a second picker and verify the original workspace stays open.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 7,
+    "expected": "Close a dirty tab: Cancel retains it, Save persists then closes it, Discard closes without writing. Repeat for workspace replacement and application exit.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 9,
+    "expected": "Move a disposable item to the Recycle Bin. Verify the confirmation can be cancelled, confirmation removes the item from the tree, affected tabs close, and Windows can restore the item.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 10,
+    "expected": "Edit a file externally. Refresh: clean tabs reload, dirty tabs show a conflict. Save the dirty tab and exercise Cancel, Reload, and explicit Overwrite.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 11,
+    "expected": "Remove a file externally and confirm its buffer survives with an explanatory banner. Try a read-only save and confirm edits survive the error.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 12,
+    "expected": "Attempt to open a binary file, UTF-16 file, mixed-line-ending file, and file larger than 10 MiB. Verify actionable errors. Try invalid names and collisions; existing contents must survive.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 13,
+    "expected": "Check resize, keyboard focus, dialog Escape, explorer visibility, and status information at the minimum window size.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 15,
+    "expected": "Open the terminal with the activity-bar button and with Ctrl+`. Confirm the shell prompt appears and that the button is disabled before a folder is open.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 16,
+    "expected": "Run `cd` and confirm the shell started in the workspace folder. Run a command that prints Turkish characters and confirm they are not mangled.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 17,
+    "expected": "Run an interactive command, cancel it with Ctrl+C, and confirm the shell survives. Confirm colored output renders.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 18,
+    "expected": "Drag the terminal divider and resize the window. Confirm long output rewraps to the new width rather than staying at the old one.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 19,
+    "expected": "Hide the terminal, run a command that keeps printing, reopen it, and confirm the output continued and scrollback survived.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 20,
+    "expected": "Type `exit`. Confirm the exit code is reported and that Restart brings back a working shell in the same folder.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 21,
+    "expected": "Stop the terminal with Close. Confirm the panel closes and no shell remains in Task Manager. Repeat by opening another folder while a shell runs.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 22,
+    "expected": "Close the application with a terminal running. Confirm no orphaned shell process remains.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 23,
+    "expected": "Use New project, name it, and choose a parent folder. Confirm the folder and `.tbce/project.json` are created and the project opens. Repeat with an existing name and confirm the error.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 24,
+    "expected": "Convert an already-open plain folder into a project. Edit the name, stack, architecture, branch, and commands afterwards, and confirm `project.json` on disk matches.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 25,
+    "expected": "Restart TBCE. Confirm the project appears under Recent, reopens with its manifest detected, and that a plain folder is listed without the project tag.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 26,
+    "expected": "Rename or delete a recent project's folder outside TBCE, then open it from Recent. Confirm an explanatory error appears and the entry disappears.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 27,
+    "expected": "Corrupt `project.json` with invalid JSON and then with a higher `schemaVersion`. Reopen the folder each time and confirm TBCE explains the problem instead of failing, and that project settings can repair it.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 28,
+    "expected": "Open Stacks with an empty application-data library. Confirm its empty state, create a plain disposable folder with source files, a binary asset, an empty directory, `.env`, `.env.example`, dependency/build folders, `.git`, and `.tbce`. Save it as a stack and verify inclusion defaults and file count/size. Git and TBCE metadata must not be selectable; explicitly include an excluded file and deselect a source file.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 29,
+    "expected": "Capture with unsaved editor buffers. Verify Save all and continue, Use files on disk, and Cancel. A failed/conflicted save must block capture; using disk must retain dirty buffers. Change a selected file externally after inspection and verify save fails with an explanation until Refresh file list is used.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 30,
+    "expected": "Restart TBCE, move or delete the disposable source folder externally, and create a project from its saved stack in a parent with spaces/Turkish characters. Verify binary bytes, line endings, empty directories, fresh project metadata, unchanged package names, and Recent detection. No installation or command execution should occur.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 31,
+    "expected": "Edit stack details and defaults, then replace its snapshot from another disposable project. Cancel and confirm the native replacement prompt. Verify failure/cancellation leaves the old snapshot usable, success keeps the same stack ID, and previously created projects remain unchanged.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 32,
+    "expected": "Cancel and confirm Delete stack. Verify cancellation preserves the entry, confirmation removes it from the library and makes it recoverable through the Recycle Bin, and previously created projects still open with their original metadata.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 33,
+    "expected": "Try blank-project creation, an existing destination name, a read-only parent, and picker cancellation while an old workspace has dirty files and a running terminal. Failure/cancellation must preserve buffers and terminal; successful creation must switch workspaces and retire the previous terminal. Verify repeated submission cannot create duplicate projects.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 34,
+    "expected": "Test source links/junctions and a damaged saved-stack definition in a disposable library. Links must be unavailable; corrupt or future-schema entries must show an actionable warning without hiding healthy stacks.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 35,
+    "expected": "Check keyboard navigation, Escape and busy-state behavior, stack selection/default editing, long names, large file trees, and dialog scrolling at 1280 × 820 and the minimum 800 × 540 window size. Ensure every dialog action remains reachable.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 36,
+    "expected": "Open Architectures with an empty disposable library. Create a named architecture with description, boundaries, nested/empty folders, and UTF-8 starter files containing Turkish characters. Check the structure tree, add/remove file controls, validation errors, and unsaved-change cancellation.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 37,
+    "expected": "Restart TBCE. Confirm architecture persistence, edit its name and contents, and confirm its ID stays stable. A malformed or future-schema definition must show a warning while healthy entries remain usable.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 38,
+    "expected": "Create a blank project with the saved architecture. Verify empty directories, literal UTF-8 contents, a fresh schema-version-1 manifest with the architecture ID, Recent detection, and no command execution.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 39,
+    "expected": "Create with a stack and architecture sharing folders. Verify both sets of files survive. Test duplicate file paths, file/directory conflicts, and different casing; preview must show conflicts and disable creation. Choose a different architecture or none and confirm recovery.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 40,
+    "expected": "Select architectures in project settings and stack defaults. Confirm settings only change metadata; a known stack default is selected during creation. Unavailable legacy/deleted values must remain visible as metadata, with an explanation that they generate no structure.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 41,
+    "expected": "Cancel and confirm architecture deletion. Check Recycle Bin recovery and that existing projects stay unchanged. Exercise picker cancellation, failed creation, and repeated submission with an old dirty workspace and terminal; cancellation/failure must preserve the old workspace and successful creation must retire its terminal.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 42,
+    "expected": "Check keyboard navigation, Escape, busy controls, long paths/content, and dialog scrolling at 1280 × 820 and 800 × 540. Ensure all architecture editor and new-project actions remain reachable.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 57,
+    "expected": "Open a plain folder and choose Source control. Confirm the panel offers to initialize or clone, and that neither runs on its own. Initialize with a named first branch, then confirm outside TBCE that the repository exists on that branch and that the panel and the explorer label agree. Open a subdirectory of a repository and confirm the panel explains that the repository is above it and offers no operations.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 58,
+    "expected": "Rename `git.exe` out of the way or edit `PATH`, then reopen a repository. Confirm the panel explains that Git is unavailable, that the folder still opens, and that editing and saving still work.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 59,
+    "expected": "With staged and unstaged edits to the same file, plus a rename, a deletion, an untracked file and a file with Turkish characters in its name, confirm both lists match `git status --porcelain=v2` and that the added/removed counts match `git diff --numstat`.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 60,
+    "expected": "Stage individual paths, stage everything including a deletion, and unstage. After unstaging, compare the working file outside TBCE and confirm it is byte-identical. Repeat before the first commit in a new repository.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 61,
+    "expected": "Try to commit with an empty message and with nothing staged; confirm the button stays disabled. Unset `user.email`, stage something, and confirm the commit is refused with an explanation, that no commit is created, and that the typed message survives. Set an identity, commit, and confirm `git show` outside TBCE matches what was staged rather than later edits.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 62,
+    "expected": "Create a merge conflict outside TBCE. Confirm the conflicted file is listed, that committing is refused with an explanation, and that committing becomes possible only after the conflict is resolved and staged.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 63,
+    "expected": "Create a branch and confirm the current branch does not change. Switch branches with a clean tree, then make an edit and confirm switching is refused with the edit intact. Delete a merged branch: confirm the native prompt appears, that cancelling preserves the branch, and that confirming removes it. Confirm the current branch cannot be deleted from the panel.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 64,
+    "expected": "Using a local bare repository as a remote and two clones, fetch, pull and push from the panel. Confirm ahead and behind counts change as expected and are blank rather than zero when a branch has no upstream. Confirm pushing an unpublished branch sets its upstream. Make the clones diverge, then confirm pull and push are both refused and the bare repository is unchanged.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 65,
+    "expected": "Clone from a local path through the panel: name the folder, choose the parent in the native picker, and confirm the reported location. Confirm cancelling either prompt or the picker creates nothing, that an existing destination name is refused with its contents intact, and that the open workspace does not change. Attempt `ext::sh -c touch pwn`, a `git://` URL and an `http://` URL; each must be refused before anything runs.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  },
+  {
+    "check": 66,
+    "expected": "Select a text change, a staged change, a renamed file and a binary file, and confirm each preview: the patch is read-only, the rename shows both paths, and the binary file explains that there is nothing to show. Confirm opening a preview leaves open tabs and the active tab untouched and that closing it returns to the editor. Read history past one page with Load more, and confirm an unborn branch reports an empty history. Check keyboard navigation, busy-state controls and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming every panel action stays reachable.",
+    "observed": "Not executed; original package crashed at startup. Retest awaits rebuilt package.",
+    "evidence": [
+      "startup-defect.json",
+      "launch-stderr.txt"
+    ],
+    "status": "blocked"
+  }
+]

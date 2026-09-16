@@ -1,0 +1,32 @@
+﻿[
+    {
+        "ProcessId":  5648,
+        "ParentProcessId":  33300,
+        "ExecutablePath":  "C:\\Program Files\\nodejs\\node.exe",
+        "CommandLine":  "\"node\"   \"C:\\Users\\mysf5\\AppData\\Roaming\\npm\\\\node_modules\\@openai\\codex\\bin\\codex.js\" "
+    },
+    {
+        "ProcessId":  27148,
+        "ParentProcessId":  15668,
+        "ExecutablePath":  "C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node.exe",
+        "CommandLine":  "\"C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node.exe\" C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node_modules\\@oai\\cua-repl\\bin\\cua-repl.mjs"
+    },
+    {
+        "ProcessId":  4668,
+        "ParentProcessId":  30140,
+        "ExecutablePath":  "C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node.exe",
+        "CommandLine":  "C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node.exe --experimental-vm-modules --eval \"// Node\u0027s emulated realpath walks every ancestor. Windows may allow the target\n// while denying metadata on an ancestor (notably AppData). Keep normal Node\n// resolution, including symlink identity, and retry that failure using a handle\n// to the target. This grants no access and does not bypass reads or trust checks.\nconst fs = require(\\\"node:fs\\\");\nconst originalRealpathSync = fs.realpathSync;\nfs.realpathSync = Object.assign(\n  function realpathSync(path, options) {\n    try {\n      return originalRealpathSync(path, options);\n    } catch (error) {\n      if (\n        error?.syscall !== \\\"lstat\\\" ||\n        (error.code !== \\\"EPERM\\\" \u0026\u0026 error.code !== \\\"EACCES\\\")\n      ) {\n        throw error;\n      }\n      try {\n        return originalRealpathSync.native(path, options);\n      } catch {\n        throw error;\n      }\n    }\n  },\n  { native: originalRealpathSync.native },\n);\n\n// --eval leaves the script at argv[1]. Use Node\u0027s ordinary main-module loader\n// so argv, require.main, and relative imports keep their normal meaning.\nrequire(\\\"node:module\\\").runMain();\n\" C:\\Users\\mysf5\\AppData\\Local\\Temp\\.tmpzDkp49\\kernel.js --session-id 8d9fd96d34ae4603b9bf790df60258c3 --working-dir C:\\Users\\mysf5\\Masaüstü\\TBCE"
+    },
+    {
+        "ProcessId":  35352,
+        "ParentProcessId":  24600,
+        "ExecutablePath":  "C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node.exe",
+        "CommandLine":  "C:\\Users\\mysf5\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\6f12e0ef1c6e5061\\bin\\node.exe --experimental-vm-modules --eval \"// Node\u0027s emulated realpath walks every ancestor. Windows may allow the target\n// while denying metadata on an ancestor (notably AppData). Keep normal Node\n// resolution, including symlink identity, and retry that failure using a handle\n// to the target. This grants no access and does not bypass reads or trust checks.\nconst fs = require(\\\"node:fs\\\");\nconst originalRealpathSync = fs.realpathSync;\nfs.realpathSync = Object.assign(\n  function realpathSync(path, options) {\n    try {\n      return originalRealpathSync(path, options);\n    } catch (error) {\n      if (\n        error?.syscall !== \\\"lstat\\\" ||\n        (error.code !== \\\"EPERM\\\" \u0026\u0026 error.code !== \\\"EACCES\\\")\n      ) {\n        throw error;\n      }\n      try {\n        return originalRealpathSync.native(path, options);\n      } catch {\n        throw error;\n      }\n    }\n  },\n  { native: originalRealpathSync.native },\n);\n\n// --eval leaves the script at argv[1]. Use Node\u0027s ordinary main-module loader\n// so argv, require.main, and relative imports keep their normal meaning.\nrequire(\\\"node:module\\\").runMain();\n\" C:\\Users\\mysf5\\AppData\\Local\\Temp\\.tmpzDkp49\\trusted-worker.js C:\\Users\\mysf5\\Masaüstü\\TBCE"
+    },
+    {
+        "ProcessId":  4436,
+        "ParentProcessId":  14584,
+        "ExecutablePath":  "C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\installed\\tbce.exe",
+        "CommandLine":  "\"C:\\Users\\mysf5\\Masaüstü\\TBCE\\.verification\\desktop-acceptance-2026-09-17\\installed\\tbce.exe\" "
+    }
+]

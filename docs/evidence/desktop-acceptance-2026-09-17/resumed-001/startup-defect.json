@@ -1,0 +1,10 @@
+﻿{
+    "Time":  "2026-09-17T00:29:51.9187914+03:00",
+    "Check":  1,
+    "Expected":  "Installed package launches without Vite",
+    "Observed":  "No TBCE window; startup panics because Templates and Git are both aliases of Mutex\u003c()\u003e and Tauri registers the same concrete managed state twice.",
+    "Evidence":  "launch-stderr.txt",
+    "Status":  "fail",
+    "InstallerSHA256":  "9DFC7C73091D69891327587E324B61DE8CB82FFADE5D570E9BA8BC7312E5CA33",
+    "Fix":  "Distinct Templates and Git newtypes plus regression test using production state registration"
+}
