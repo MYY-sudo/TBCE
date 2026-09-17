@@ -2,6 +2,7 @@ mod architecture;
 mod commands;
 mod filesystem;
 mod git;
+mod github;
 mod process;
 mod project;
 mod templates;
@@ -16,6 +17,7 @@ pub fn run() {
         .manage(commands::Terminals::default())
         .manage(commands::Templates::default())
         .manage(commands::Git::default())
+        .manage(commands::GitHub::default())
         .on_window_event(|window, event| {
             // Shell processes keep running after the window is gone unless they are stopped here.
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -43,6 +45,14 @@ pub fn run() {
             commands::git_init_repository,
             commands::git_status,
             commands::git_branches,
+            commands::github_account,
+            commands::github_sign_in,
+            commands::github_sign_out,
+            commands::github_link,
+            commands::github_repository,
+            commands::github_branches,
+            commands::github_commits,
+            commands::github_activity,
             commands::list_architectures,
             commands::get_architecture,
             commands::save_architecture,
@@ -70,7 +80,7 @@ pub fn run() {
             commands::write_terminal,
             commands::resize_terminal,
             commands::stop_terminal,
-            commands::restart_terminal
+            commands::restart_terminal,
         ])
         .run(tauri::generate_context!())
         .expect("could not run TBCE");
@@ -80,7 +90,7 @@ pub fn run() {
 mod tests {
     #[test]
     fn managed_services_have_distinct_state_keys() {
-        use super::commands::{Backend, Git, Templates, Terminals};
+        use super::commands::{Backend, Git, GitHub, Templates, Terminals};
         use std::any::TypeId;
         // Tauri uses TypeId as its state key. A type alias does not make a new key
         // and causes startup to panic, even when service tests pass in isolation.
@@ -89,6 +99,7 @@ mod tests {
             TypeId::of::<Terminals>(),
             TypeId::of::<Templates>(),
             TypeId::of::<Git>(),
+            TypeId::of::<GitHub>(),
         ];
         let unique: std::collections::HashSet<_> = keys.into_iter().collect();
         assert_eq!(

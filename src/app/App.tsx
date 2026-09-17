@@ -15,11 +15,13 @@ import {
   Layers,
   Blocks,
   GitBranch,
+  Github,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { actions as terminalActions, useTerminal } from '../stores/terminal';
 import { actions as projectActions, useProject } from '../stores/project';
 import { actions as gitActions, useGit } from '../stores/git';
+import { actions as githubActions } from '../stores/github';
 import { useDialog } from '../stores/dialog';
 import { Dialog } from '../components/Dialog';
 import { Explorer } from '../explorer/Explorer';
@@ -29,6 +31,7 @@ import { StacksPanel } from '../templates/StacksPanel';
 import { NewProjectDialog } from '../templates/StackDialogs';
 import { ArchitecturesPanel } from '../architecture/ArchitecturesPanel';
 import { SourceControlPanel } from '../git/SourceControlPanel';
+import { GitHubPanel } from '../github/GitHubPanel';
 const Editor = lazy(() => import('../editor/Editor'));
 const DiffView = lazy(() => import('../git/DiffView'));
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
@@ -47,16 +50,16 @@ export function App() {
   const diff = useGit((s) => s.selected);
   const [sidebar, setSidebar] = useState(true);
   const [panel, setPanel] = useState<
-    'explorer' | 'git' | 'stacks' | 'architectures'
+    'explorer' | 'git' | 'github' | 'stacks' | 'architectures'
   >('explorer');
   const [newProject, setNewProject] = useState(false);
   const [width, setWidth] = useState(252);
   const [dock, setDock] = useState(248);
   const active = state.tabs.find((t) => t.id === state.activeId);
   // The focus listener is installed once, so it reads the visible panel through a ref instead of
-  // capturing it. Git is refreshed only while its panel is on screen.
-  const visible = useRef(panel);
-  visible.current = panel;
+  // capturing it. Git and GitHub are refreshed only while their own panel is on screen.
+  const visible = useRef<typeof panel | null>(panel);
+  visible.current = sidebar ? panel : null;
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -85,6 +88,7 @@ export function App() {
     const focus = () => {
       void actions.checkExternal();
       if (visible.current === 'git') void gitActions.refresh();
+      if (visible.current === 'github') void githubActions.refresh();
     };
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (useWorkspace.getState().tabs.some(isDirty)) {
@@ -184,6 +188,17 @@ export function App() {
             <GitBranch size={20} />
           </button>
           <button
+            title="GitHub"
+            aria-label="GitHub"
+            className={panel === 'github' && sidebar ? 'activity-active' : ''}
+            onClick={() => {
+              setSidebar(panel !== 'github' || !sidebar);
+              setPanel('github');
+            }}
+          >
+            <Github size={20} />
+          </button>
+          <button
             title="Stacks"
             aria-label="Stacks"
             className={panel === 'stacks' && sidebar ? 'activity-active' : ''}
@@ -225,6 +240,8 @@ export function App() {
                 <Explorer />
               ) : panel === 'git' ? (
                 <SourceControlPanel />
+              ) : panel === 'github' ? (
+                <GitHubPanel />
               ) : panel === 'stacks' ? (
                 <StacksPanel />
               ) : (

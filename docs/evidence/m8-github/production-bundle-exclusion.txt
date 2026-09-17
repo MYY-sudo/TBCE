@@ -1,0 +1,49 @@
+Milestone 8 - GitHub connection: production bundle inspection
+Date: 2026-09-17
+Build: npm run tauri build -- --target x86_64-pc-windows-msvc
+Bundle: dist/ as produced by that build (Vite 7, production mode)
+
+Two things are checked here. The first is the check Milestones 6 and 7 recorded:
+the development-only Git harness must not ship. The second is new to this
+milestone: the webview must not name the GitHub host, because every request is
+built in Rust from a workspace identifier and a page number.
+
+$ grep -rl "tbce-git-harness-dev-only" dist/
+(no matches)
+
+The harness component and its marker string are both absent. import.meta.env.DEV
+is replaced with a literal false in a production build, so the branch and its
+dynamic import are removed and no harness chunk is emitted.
+
+$ grep -rl "api.github.com" dist/
+(no matches)
+
+The API host appears nowhere in the bundle. It is a constant in
+src-tauri/src/github/mod.rs and never crosses IPC.
+
+$ grep -rl "github.com/settings/tokens" dist/
+dist/assets/index-tOPEuFzt.js
+
+This one does ship, and is expected to: it is the sentence telling the user where
+to create a token. It is guidance text, not an endpoint the webview calls.
+
+$ grep -rl "github_repository" dist/assets
+dist/assets/index-tOPEuFzt.js
+
+The eight command names ship in the typed adapter, which is the whole IPC
+contract and is expected. What does not ship is any host, path, header or URL.
+
+$ ls dist/assets | grep -iE "harness|github"
+(no harness or github chunk)
+
+The panel ships inside the main entry chunk, like the explorer and the source
+control panel, because it is imported eagerly rather than lazily. The lazy chunks
+are unchanged: Editor, DiffView and TerminalPanel.
+
+$ grep -o "connect-src[^\"]*" src-tauri/tauri.conf.json
+connect-src ipc: http://ipc.localhost; worker-src 'self' blob:
+
+The content security policy is unchanged by this milestone. connect-src stays
+IPC-only and img-src stays 'self' data:, so the webview can make no request of
+its own and can load no remote image. That is why the panel shows a login name
+rather than an avatar.

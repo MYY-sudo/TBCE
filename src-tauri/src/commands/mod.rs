@@ -1,6 +1,7 @@
 use crate::architecture::{Architecture, ArchitectureFields, ArchitectureService, Preview};
 use crate::filesystem::{Document, Entry, FileSystemService, Result, ServiceError, Workspace};
 use crate::git::{self, GitService};
+use crate::github::{self, GitHubService};
 use crate::project::{Project, ProjectDetection, ProjectFields, ProjectService};
 use crate::templates::{Catalog, SourceEntry, Stack, StackFields, TemplateService};
 use crate::terminal::{Terminal, TerminalEvent, TerminalService};
@@ -16,6 +17,10 @@ pub type Terminals = Mutex<TerminalService>;
 pub struct Templates(Mutex<()>);
 #[derive(Default)]
 pub struct Git(Mutex<()>);
+/// Unlike the two locks above, this one guards a service that holds state: the conditional-request
+/// cache. Its concrete type is therefore a key of its own without needing a newtype.
+#[derive(Default)]
+pub struct GitHub(Mutex<GitHubService>);
 
 fn architecture_service(app: &AppHandle) -> Result<ArchitectureService> {
     ArchitectureService::new(
@@ -421,6 +426,87 @@ pub async fn git_branches(app: AppHandle, workspace_id: String) -> Result<git::B
         GitService::open(&root)?.branches(recorded_default(&root).as_deref())
     })
     .await
+}
+
+/// Serializes GitHub reads and owns the conditional-request cache. This lock is never held while
+/// the Git lock is taken: the repository is identified first and released, then the request is
+/// made, so a slow answer from GitHub cannot block staging a file.
+async fn github_task<T: Send + 'static>(
+    app: AppHandle,
+    task: impl FnOnce(&mut GitHubService) -> Result<T> + Send + 'static,
+) -> Result<T> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<GitHub>();
+        let mut service = state
+            .0
+            .lock()
+            .map_err(|_| ServiceError::new("INTERNAL", "GitHub service is unavailable."))?;
+        task(&mut service)
+    })
+    .await
+    .map_err(|e| ServiceError::new("INTERNAL", e.to_string()))?
+}
+
+/// Which repository the open folder belongs to. The webview never supplies this: it is read from
+/// the workspace's own Git remote under the Git lock, which is released before anything is sent.
+async fn linked(app: &AppHandle, workspace_id: String) -> Result<(String, String)> {
+    git_task(app.clone(), workspace_id, |root, _| github::linked(&root)).await
+}
+
+#[tauri::command]
+pub async fn github_account(app: AppHandle) -> Result<github::Account> {
+    github_task(app, |service| service.account()).await
+}
+#[tauri::command]
+pub async fn github_sign_in(app: AppHandle, token: String) -> Result<github::Account> {
+    // The only command that accepts a token. Nothing ever returns one.
+    github_task(app, move |service| service.sign_in(&token)).await
+}
+#[tauri::command]
+pub async fn github_sign_out(app: AppHandle) -> Result<()> {
+    github_task(app, |service| service.sign_out()).await
+}
+#[tauri::command]
+pub async fn github_link(app: AppHandle, workspace_id: String) -> Result<github::Link> {
+    // Runs Git and no network, so opening the panel never waits on a request to find out whether
+    // there is anything to request.
+    git_task(app, workspace_id, |root, _| Ok(github::link(&root))).await
+}
+#[tauri::command]
+pub async fn github_repository(app: AppHandle, workspace_id: String) -> Result<github::Repository> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.repository(&owner, &repo)).await
+}
+#[tauri::command]
+pub async fn github_branches(
+    app: AppHandle,
+    workspace_id: String,
+    page: u32,
+) -> Result<github::Page<github::Branch>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.branches(&owner, &repo, page)).await
+}
+#[tauri::command]
+pub async fn github_commits(
+    app: AppHandle,
+    workspace_id: String,
+    page: u32,
+    reference: Option<String>,
+) -> Result<github::Page<github::Commit>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.commits(&owner, &repo, reference.as_deref(), page)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn github_activity(
+    app: AppHandle,
+    workspace_id: String,
+    page: u32,
+) -> Result<github::Page<github::Activity>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.activity(&owner, &repo, page)).await
 }
 
 fn lock(state: &Backend) -> Result<std::sync::MutexGuard<'_, FileSystemService>> {

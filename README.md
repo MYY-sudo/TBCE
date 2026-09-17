@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 7: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, and the source-control panel over it. Desktop acceptance for the terminal, project system, stacks, architectures, and Git remains pending; see the verification record.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 8: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, and read-only GitHub repository context. Desktop acceptance for the terminal, project system, stacks, architectures, Git, and GitHub remains pending; see the verification record.
 
 ## Available now
 
@@ -22,8 +22,10 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - Read real repository state: branch, upstream, ahead/behind, staged and unstaged changes, untracked files, conflicts, branches, history, and diffs.
 - Initialize and clone repositories, create and switch branches, stage and unstage, commit, and exchange commits with a remote.
 - Do all of it from a source-control panel: review changes, stage them, write a commit, switch branches, fetch, pull, push, read paged history, and preview any change as a patch.
+- Connect a GitHub account with a personal access token kept in the Windows Credential Manager, and read the repository behind the open project: owner, description, default branch, visibility, language, last push, stars, forks and watchers.
+- Read the remote branches GitHub reports, paged commits, and recent repository activity, all read-only.
 
-GitHub integration, running project commands, and the rest of V1 remain for later milestones.
+GitHub issues and pull requests, the project dashboard, running project commands, and the rest of V1 remain for later milestones.
 
 ## Projects
 
@@ -86,15 +88,44 @@ rather than merging or rebasing. Push is never forced. Merge and rebase workflow
 push, hard reset, stash, and tags are deferred.
 
 Staging works per file and for everything at once; a file cannot yet be staged in
-pieces, and commits cannot be amended. The panel lists your local branches; remote
-branches wait for GitHub integration.
+pieces, and commits cannot be amended. The source-control panel lists your local
+branches; the GitHub panel lists the branches GitHub reports.
 
-Credentials are your own. TBCE uses the credential helpers and SSH keys Git is already
-configured with, and never writes global or system Git configuration. Interactive
+Credentials are your own. For Git, TBCE uses the credential helpers and SSH keys Git is
+already configured with, and never writes global or system Git configuration. A GitHub
+token is separate and is the one secret TBCE stores itself: see the GitHub section below. Interactive
 prompts are disabled, so a missing credential fails with an explanation instead of
 hanging; a passphrase-protected SSH key with no agent running will time out. Repository
 locations must be HTTPS, SSH, `file://`, or a local path — transport helpers such as
 `ext::` name a program to run and are refused outright.
+
+## GitHub
+
+Connecting an account is optional and read-only. TBCE never writes to GitHub: there is
+no issue creation, no starring and no releases in this release.
+
+Create a personal access token at github.com/settings/tokens. A fine-grained token needs
+Metadata: Read and Contents: Read; a classic token needs `repo` for private repositories
+or `public_repo` for public ones. Paste it once into the panel's masked field.
+
+The token is stored in the Windows Credential Manager under `com.tbce.app`, written only
+after GitHub accepts it, and read again for each request. It is never written into your
+project, never into application data, and never sent back to the interface. Disconnecting
+removes it. If GitHub reports that it has been revoked, TBCE drops it and offers to
+connect again. On operating systems other than Windows, storing a token is not supported
+in this release.
+
+Which repository you are looking at comes from your own Git remote — the one your branch
+tracks, or the only one, or `origin` — so there is nothing to configure. A remote pointing
+anywhere other than github.com is explained rather than attempted. Every request is built
+in Rust from a workspace identifier and a page number; the interface cannot name a host, a
+path or a URL, and the application still allows no remote origin in the webview at all,
+which is why you see your login name rather than an avatar.
+
+The panel reads only while it is open: when it appears, when the window regains focus, and
+when you use Refresh. Nothing polls. GitHub counts pull requests as issues, so the single
+count on the Overview is labelled as open issues and pull requests together; separate lists
+arrive with the issue and pull request milestones.
 
 ## Development
 
@@ -140,20 +171,21 @@ Click the workspace name in the explorer to select the root before creating a ro
 
 ## Current limits
 
-One workspace per window, explicit saves, and no editor session restoration or crash recovery. The editor supports UTF-8 files, optionally with BOM, up to 10 MiB, using LF or CRLF. Binary files, other encodings, and mixed/legacy line endings cannot be edited but can be copied in stack snapshots. Symlinks and junctions are rejected. Monaco language features are bundled locally; no CDN or account is required.
+One workspace per window, explicit saves, and no editor session restoration or crash recovery. The editor supports UTF-8 files, optionally with BOM, up to 10 MiB, using LF or CRLF. Binary files, other encodings, and mixed/legacy line endings cannot be edited but can be copied in stack snapshots. Symlinks and junctions are rejected. Monaco language features are bundled locally; no CDN is required and no account is needed for anything except GitHub context, which is optional.
 
 One terminal at a time, running the operating system's default shell. Multiple terminal tabs, terminal names, command history, and choosing a shell arrive in later milestones. On Windows the session is started in UTF-8 so that tool output and non-ASCII file names survive; `cmd.exe` and PowerShell are recognized, and any other shell keeps the code page it starts with. Closing a terminal ends its session and its scrollback. Closing the window stops every shell.
 
-Rust confines editing and snapshot source reads to the selected workspace, saved stacks to application data, and new-project creation to a native-picked parent. Destructive editor operations cannot target the workspace root. The terminal starts in the workspace root and the webview cannot choose a program or directory, but commands the user types run with the application's privileges: the shell is not a sandbox. See the architecture notes for the local-process race limitation before building untrusted automation on these services.
+Rust confines editing and snapshot source reads to the selected workspace, saved stacks to application data, and new-project creation to a native-picked parent. The one credential TBCE stores, a GitHub token, is kept in the Windows Credential Manager and never crosses back into the webview; GitHub requests are built in Rust, so the interface cannot name a host or a URL. Destructive editor operations cannot target the workspace root. The terminal starts in the workspace root and the webview cannot choose a program or directory, but commands the user types run with the application's privileges: the shell is not a sandbox. See the architecture notes for the local-process race limitation before building untrusted automation on these services.
 
 ## Documentation
 
 - [Full product vision and V1/V2 roadmap](docs/roadmap.md)
 - [Milestone 6 delivery checklist and prerequisite gate](docs/milestone-6.md)
 - [Milestone 7 delivery checklist](docs/milestone-7.md)
+- [Milestone 8 delivery checklist](docs/milestone-8.md)
 - [Architecture and native interfaces](docs/architecture.md)
 - [Windows acceptance checklist](docs/acceptance.md)
-- [Manual acceptance run-sheet for checks 15-42 and 57-66](docs/acceptance-runsheet-m6.md)
+- [Manual acceptance run-sheet for checks 15-42, 57-66 and 67-74](docs/acceptance-runsheet-m6.md)
 - [Verification results](docs/verification.md)
 - [Remaining work](docs/remaining-work.md)
 

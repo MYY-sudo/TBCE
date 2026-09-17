@@ -4,7 +4,9 @@ import { App } from '../src/app/App';
 import { useWorkspace } from '../src/stores/workspace';
 import { useProject } from '../src/stores/project';
 import { useGit } from '../src/stores/git';
+import { useGitHub } from '../src/stores/github';
 import { git } from '../src/services/git';
+import { github } from '../src/services/github';
 vi.mock('../src/editor/Editor', () => ({
   default: () => <div>Editor surface</div>,
 }));
@@ -28,6 +30,18 @@ vi.mock('../src/services/git', () => ({
     fetch: vi.fn(),
     pull: vi.fn(),
     push: vi.fn(),
+  },
+}));
+vi.mock('../src/services/github', () => ({
+  github: {
+    account: vi.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    link: vi.fn(),
+    repository: vi.fn(),
+    branches: vi.fn(),
+    commits: vi.fn(),
+    activity: vi.fn(),
   },
 }));
 const repository = {
@@ -55,6 +69,9 @@ beforeEach(() => {
   useWorkspace.setState(useWorkspace.getInitialState());
   useProject.setState({ ...useProject.getInitialState(), recent: [] });
   useGit.setState(useGit.getInitialState(), true);
+  useGitHub.setState(useGitHub.getInitialState(), true);
+  vi.mocked(github.account).mockResolvedValue({ status: 'signedOut' });
+  vi.mocked(github.link).mockResolvedValue({ status: 'noRepository' });
   vi.mocked(git.detect).mockResolvedValue({ status: 'found', repository });
   vi.mocked(git.status).mockResolvedValue(status);
   vi.mocked(git.branches).mockResolvedValue({
@@ -135,6 +152,35 @@ test('the activity bar opens the source control panel, which refreshes on focus'
   await waitFor(() => expect(git.status).toHaveBeenCalledTimes(2));
 });
 
+test('the activity bar opens the GitHub panel, which reads nothing until connected', async () => {
+  render(<App />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'GitHub' }));
+
+  expect(screen.getByText('GITHUB')).toBeInTheDocument();
+  expect(await screen.findByText('NOT CONNECTED')).toBeInTheDocument();
+  await waitFor(() => expect(github.account).toHaveBeenCalled());
+  // A panel with no account asks GitHub for nothing about any repository.
+  expect(github.repository).not.toHaveBeenCalled();
+  expect(github.commits).not.toHaveBeenCalled();
+  // Nor does opening it start reading Git for the source control panel.
+  expect(git.status).not.toHaveBeenCalled();
+});
+
+test('the GitHub panel is not read while another panel is showing', async () => {
+  render(<App />);
+  useWorkspace.setState({
+    workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+  });
+
+  await waitFor(() => expect(git.detect).toHaveBeenCalled());
+  fireEvent.focus(window);
+
+  // The workspace subscription reads the remote for the panel's label; nothing asks GitHub.
+  expect(github.account).not.toHaveBeenCalled();
+  expect(github.repository).not.toHaveBeenCalled();
+});
+
 test('the source control panel is not read while another panel is showing', async () => {
   render(<App />);
   useWorkspace.setState({
@@ -175,3 +221,72 @@ test('opening a diff hides the editor instead of unmounting it', async () => {
   useGit.setState({ selected: null });
   await waitFor(() => expect(screen.getByText('Editor surface')).toBeVisible());
 });
+
+test.each(['GitHub', 'Toggle explorer'])(
+  'a GitHub panel collapsed with %s does not fetch on window focus',
+  async (collapseButton) => {
+    vi.mocked(github.account).mockResolvedValue({
+      status: 'signedIn',
+      login: 'test-user',
+      name: null,
+      scopes: [],
+      rate: null,
+    });
+    vi.mocked(github.link).mockResolvedValue({
+      status: 'found',
+      remote: 'origin',
+      owner: 'test-owner',
+      repo: 'test-repo',
+    });
+    vi.mocked(github.repository).mockResolvedValue({
+      owner: 'test-owner',
+      name: 'test-repo',
+      fullName: 'test-owner/test-repo',
+      description: null,
+      defaultBranch: 'main',
+      private: false,
+      fork: false,
+      archived: false,
+      stars: 0,
+      forks: 0,
+      watchers: 0,
+      openIssuesAndPullRequests: 0,
+      pushedAt: null,
+      language: null,
+      url: null,
+      rate: null,
+    });
+    vi.mocked(github.branches).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+      rate: null,
+    });
+    vi.mocked(github.commits).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+      rate: null,
+    });
+    vi.mocked(github.activity).mockResolvedValue({
+      items: [],
+      page: 1,
+      hasMore: false,
+      rate: null,
+    });
+    useWorkspace.setState({
+      workspace: { id: 'review-workspace', name: 'test', path: 'C:/test' },
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'GitHub' }));
+    await waitFor(() => expect(useGitHub.getState().repository).not.toBeNull());
+    await waitFor(() => expect(useGitHub.getState().dataBusy).toBe(false));
+    fireEvent.click(screen.getByRole('button', { name: collapseButton }));
+    expect(screen.queryByText('GITHUB')).toBeNull();
+    vi.mocked(github.repository).mockClear();
+    vi.mocked(github.link).mockClear();
+    fireEvent.focus(window);
+    await waitFor(() => expect(useGitHub.getState().dataBusy).toBe(false));
+    expect(github.repository).not.toHaveBeenCalled();
+  },
+);

@@ -63,9 +63,22 @@
 - Complete installed-app acceptance checks 57-66: initialization and cloning through the panel, staging and committing confirmed on disk, branch operations with their native confirmation, remote operations against a real remote, the diff preview, and layout at the minimum window size.
 - Add partial and hunk-level staging. Staging works per file and for everything; a file cannot be committed in pieces.
 - Add commit amending, and decide how a conflicted file should be resolved inside TBCE. Both are refused by the backend today, so both need backend work first.
-- Show remote branches. `git_branches` returns them and the store keeps them; the panel lists only local branches, which is enough until Milestone 8 gives remotes somewhere to belong.
+- Show remote branches in this panel. `git_branches` returns them and the store keeps them, and the GitHub panel now lists the branches GitHub reports, so what is missing is the local view of remote-tracking refs rather than any remote information at all.
 - Reconsider refreshing on window focus once a file watcher exists. Nothing polls, so a change made outside TBCE appears on the next focus or on Refresh, not immediately.
 - Consider progress and cancellation in the panel for clone, fetch and push. They show a busy state and block other Git operations until the backend deadline passes.
+- Translate the panel with the rest of the interface in Milestone 14. Its strings are English and inlined, like every other component.
+
+## Within GitHub
+
+- Complete installed-app acceptance checks 67-74: connecting and disconnecting an account, credential storage confirmed in Windows Credential Manager, the three remote states, Overview values checked against github.com, branch and commit paging, a revoked token, refusals, and layout at the minimum window size.
+- Exercise the real API. Every automated test answers from a mock server on loopback, so live field values, pagination on a large repository, the activity endpoint's real access requirements, secondary rate limits and abuse detection are all unexercised. Real TLS, the bundled `native-certs` trust store and a TLS-inspecting proxy are untested for the same reason.
+- Add issue and pull request lists in Milestones 9 and 10. The Overview shows the single count GitHub reports, which counts pull requests as issues; separate counts need those milestones.
+- Decide whether a Code tab is worth having. The roadmap suggests one, and it was left out because it would duplicate the explorer for a working copy already on disk.
+- Support GitHub Enterprise hosts. Only github.com is recognized; another host is reported as a state rather than attempted.
+- Consider showing avatars. The content security policy allows no remote image, so this needs either a widened `img-src` or Rust fetching the bytes and handing over a data URL.
+- Consider OAuth device flow beside the token. A token is what this release asks for; device flow would need a registered GitHub application and a client identifier in the source.
+- Support macOS and Linux credential storage. The vault reports `CREDENTIALS_UNSUPPORTED` off Windows rather than writing a secret somewhere unprotected, and that path has not been run.
+- Reconsider the conditional-request cache if it ever needs to survive a restart. It is in memory, cleared wholesale, and exists to spare the rate limit rather than to be a store.
 - Translate the panel with the rest of the interface in Milestone 14. Its strings are English and inlined, like every other component.
 
 ## Product roadmap
@@ -73,16 +86,18 @@
 The [Milestone 6 delivery checklist](milestone-6.md) records the delivered backend
 against its evidence. G01-G11 and V01-V06 are complete; the prerequisite gate items
 P10-P12 are not. The [Milestone 7 checklist](milestone-7.md) records the panel over
-it. Desktop discovery still fails with a missing native pipe, so under the
-September 16, 2026 scope decision both the backend and its interface were built while
-a [manual run-sheet](acceptance-runsheet-m6.md) was prepared for installed-app checks
-15-42 and 57-66. Automated tests prove the code and prove nothing about the packaged
-application. Complete the run-sheet before treating any of this as desktop-verified.
+it, and the [Milestone 8 checklist](milestone-8.md) the GitHub context beside it. The
+[manual run-sheet](acceptance-runsheet-m6.md) now covers installed-app checks 15-42,
+57-66 and 67-74. Desktop automation itself works again — the September 17 resumed run
+installed the application and passed check 1 — so what is outstanding is the 45
+unexecuted checks rather than a broken tool. Automated tests prove the code and prove
+nothing about the packaged application. Complete the run-sheet before treating any of
+this as desktop-verified.
 
 See the [full product vision and V1/V2 roadmap](roadmap.md) for every milestone, completion criteria, and security requirement.
 
-Milestone 5's personal architectures, Milestone 6's Git backend and Milestone 7's source-control panel are implemented with automated coverage; desktop acceptance remains pending alongside earlier milestones. Next: GitHub context, issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
+Milestone 5's personal architectures, Milestone 6's Git backend, Milestone 7's source-control panel and Milestone 8's GitHub context are implemented with automated coverage; desktop acceptance remains pending alongside earlier milestones. Next: issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
 
-Desktop acceptance checks 15-27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28-35 and the Git UI checks 57-66. Checks 43-56 targeted the backend through the development harness; the panel now covers the same ground through the real interface, so 57-66 replace them. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
+Desktop acceptance checks 15-27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28-35, the Git UI checks 57-66 and the GitHub checks 67-74. Checks 43-56 targeted the backend through the development harness; the panel now covers the same ground through the real interface, so 57-66 replace them. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
 
 The current implementation does not claim V1 completion. Advanced automation remains outside the foundation/editor scope.

@@ -1,6 +1,6 @@
 # Architecture
 
-TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, and the source-control panel over it. GitHub integration and a database remain deferred.
+TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, and read-only GitHub repository context. Issues, pull requests, the project dashboard and a database remain deferred.
 
 ## Boundaries
 
@@ -38,6 +38,15 @@ source control panel / explorer label
   → Tauri commands
   → Rust GitService → bounded process runner
   → git executable
+```
+
+```text
+GitHub panel
+  → github store actions
+  → typed GitHubService adapter
+  → Tauri commands
+  → Rust GitHubService → bounded HTTP runner
+  → api.github.com
 ```
 
 The Rust filesystem service owns the selected root and a generation identifier. The frontend receives a display path and identifier, then supplies relative paths for editor operations and snapshot capture. Replacing the workspace invalidates the previous identifier. Native pickers choose folders, files, and new-project parents. Reopening a recent project accepts an absolute path; the stack library uses a backend-owned application-data root, as described below.
@@ -315,6 +324,161 @@ push, hard reset, stash, tags and remote-branch management are all absent, becau
 backend does not implement them and this milestone added no backend. Branch deletion
 still asks for native confirmation in Rust rather than in the webview.
 
+## GitHub service
+
+```text
+GitHub panel
+  → github store actions
+  → typed GitHubService adapter
+  → eight github_* commands
+  → Rust GitHubService → bounded HTTP runner
+  → api.github.com
+```
+
+Milestone 8 reads a repository and never writes one. It answers a single question — what does
+GitHub know about the project that is open — and leaves issues, pull requests and the dashboard to
+the milestones that own them.
+
+Three rules carry the security story, and they are the reason this shape was chosen over calling
+GitHub from the webview.
+
+- **The webview never names a host, a path, a header or a URL.** Commands carry a workspace
+  identifier and a page number; the backend builds every request. This is the same reasoning that
+  makes the terminal commands take a workspace identifier instead of a program.
+- **The token crosses IPC once, inbound.** `github_sign_in` is the only command that accepts one.
+  Nothing returns it, it is read from the vault per operation rather than held in memory, and it is
+  replaced with `***` in any text that can reach the interface.
+- **The content security policy is unchanged.** `connect-src` stays IPC-only and `img-src` stays
+  `'self' data:`, so the webview can make no request of its own and load no remote image. That is
+  why the panel shows a login name rather than an avatar; fetching avatar bytes in Rust and handing
+  over a data URL would work and is deliberately not done here.
+
+### The runner
+
+`process::run` is the wrong tool for an HTTP request and there is no second process to bound, so
+the GitHub service has a runner of its own with the same responsibilities: one function holds the
+headers, the deadlines, the size cap, the conditional cache and the classification, and nothing
+else in the application makes a network request.
+
+Every request carries `Accept: application/vnd.github+json`, `X-GitHub-Api-Version`, a
+`TBCE/<version>` user agent and a bearer token. The base URL is a field rather than a constant, but
+the production constructor pins `https://api.github.com` and there is no environment override, so a
+packaged build cannot be pointed elsewhere; the tests construct the service with a local base
+instead. Connect and read deadlines are 10 and 20 seconds — nothing here transfers a repository, so
+the Git service's 300-second network limit would only postpone a report of failure. The response
+cap is 1 MiB, read one byte past the limit so an answer that is exactly full is distinguishable from
+one that is too large.
+
+Redirects are **not** followed. A redirect would resend the authorization header to wherever it
+points, so a moved repository is reported rather than chased.
+
+`hasMore` comes from GitHub's own `Link` header, not from the size of a page: a page that happens to
+be full is not a page with more behind it. Rate-limit headers are parsed and returned alongside the
+data, so the panel can show what is left before the allowance bites, and `reset` crosses the wire as
+Unix seconds because formatting a local time is the interface's job.
+
+Answers are cached by request path with their `ETag` and revalidated with `If-None-Match`. A `304`
+reuses the cached body, including the paging flag, which the `Link` header no longer carries on a
+revalidated answer. The cache is small, in memory, and cleared wholesale on sign-in and sign-out; it
+exists to spare the rate limit, not to be a store, which is why it is not a reason to introduce
+SQLite.
+
+Failures are classified into a fixed set of codes, because `ServiceError` carries a `&'static str`:
+`GITHUB_SIGNED_OUT`, `GITHUB_AUTH_FAILED`, `GITHUB_FORBIDDEN`, `GITHUB_RATE_LIMITED`,
+`GITHUB_NOT_FOUND`, `GITHUB_UNAVAILABLE`, `GITHUB_NETWORK_FAILED`, `GITHUB_TIMED_OUT`,
+`GITHUB_RESPONSE_INVALID`, `GITHUB_NOT_LINKED`, `GITHUB_TOKEN_REJECTED`,
+`CREDENTIALS_UNAVAILABLE` and `CREDENTIALS_UNSUPPORTED`. GitHub's own `message` field is carried
+through where it explains something a user can act on — a SAML refusal, a suspended token — after
+being scrubbed.
+
+### The token
+
+The token lives in the Windows Credential Manager under the application identifier, behind a
+`CredentialStore` trait so that the rest of the module holds no platform detail and the tests need
+no vault. It is written only after `GET /user` accepts it, so a typo never replaces a working token.
+It is never written to application data or to `.tbce/project.json`: the manifest lives inside the
+user's repository, and a secret there would be one `git add` away from being published.
+
+A token GitHub reports as revoked is dropped and the account becomes signed out. There is nothing to
+argue with — a revoked token cannot be used — and repeating a failure the user cannot act on would
+be worse than offering to connect again.
+
+On anything other than Windows the vault reports `CREDENTIALS_UNSUPPORTED` rather than writing a
+secret somewhere unprotected, which matches every other document saying that only Windows is
+verified.
+
+Requests are always authenticated, even for a public repository, because an unauthenticated call
+gets sixty requests an hour and would make the panel unusable the moment it is refreshed twice.
+
+### Which repository
+
+Identity is read from the workspace's own Git remote, never supplied by the interface. `GitService`
+gained one method, `remote_url`, which reports the name and URL of the remote an operation would
+talk to — the remote the current branch tracks, else the only remote, else `origin`. No Tauri
+command was added for it, so the Git surface stays at eighteen commands and the IPC surface does not
+grow.
+
+The URL is parsed in Rust. HTTPS, `ssh://`, scp-style `git@github.com:owner/repo.git`, `git://`,
+ports and userinfo are all recognized, and userinfo is dropped rather than parsed, because a token
+in a remote URL is the user's own business and must not travel further. A host that is not
+github.com is reported as a state the panel explains: only GitHub is supported, as the roadmap
+requires. Owner and repository names are validated before they are put in a request path, so a
+crafted remote cannot reach another endpoint.
+
+`github_link` runs Git and no request at all, which is what lets the panel decide whether there is
+anything to ask about without asking.
+
+### Concurrency
+
+A mutex serializes GitHub reads and guards the cache. The lock order is worth stating, because it is
+the opposite of what the obvious implementation does: the GitHub lock is **never** held while the
+Git lock is taken. Repository identity is resolved under the Git lock and that lock is released
+before anything is sent, so a stalled or rate-limited GitHub answer cannot block staging a file or
+saving one. The filesystem service remains a leaf.
+
+### Native command contract
+
+| Command             | Arguments                    | Result                                              |
+| ------------------- | ---------------------------- | --------------------------------------------------- |
+| `github_account`    | None                         | Signed out, or login, name, scopes and rate limit   |
+| `github_sign_in`    | `token`                      | Account; stored only after GitHub accepts the token |
+| `github_sign_out`   | None                         | Void; removes the credential and clears the cache   |
+| `github_link`       | `workspaceId`                | Repository, remote or host state; runs no request   |
+| `github_repository` | `workspaceId`                | Identity, description, default branch and counts    |
+| `github_branches`   | `workspaceId`, `page`        | Page of remote branches with tip and protection     |
+| `github_commits`    | `workspaceId`, `page`, `ref` | Page of commits                                     |
+| `github_activity`   | `workspaceId`, `page`        | Page of repository activity                         |
+
+Counts are reported as GitHub reports them. `openIssuesAndPullRequests` is named after what the
+field actually contains: GitHub counts pull requests as issues, and a field called `openIssues`
+would be wrong in every repository with an open pull request.
+
+### The panel
+
+One more activity-bar panel, mounted only while it is selected, so opening a folder or working in
+the editor never reads GitHub. It reads when the panel appears, when the window regains focus while
+it is visible, and on its Refresh control. Nothing polls.
+
+One refresh reads everything the panel shows — repository, branches, commits and activity — so
+switching between Overview, Branches and Commits runs nothing at all. Four requests against a
+5000-per-hour allowance buys a panel that never waits when a tab is selected.
+
+The store keeps two busy flags rather than one. Reading a repository must not disable the account
+controls: a stalled or rate-limited read is exactly when someone wants to disconnect, and blocking
+that would trap them. The account also sits outside the state a workspace change resets, because
+signing in is global and opening another folder must not undo it.
+
+Activity is the one section allowed to fail alone. It needs more access than repository metadata, so
+a refusal leaves that section empty and explained instead of failing the whole read.
+
+### What is deliberately absent
+
+No writes of any kind: no issue or pull request creation, no starring, no releases. No issue or pull
+request lists, which belong to Milestones 9 and 10. No GitLab or Bitbucket. No OAuth device flow, no
+GitHub Enterprise host, no avatar images, no SQLite cache, no background polling, and no code
+browsing — the Code tab the roadmap suggests would duplicate the explorer for a working copy the
+user already has on disk.
+
 ## Editing and failure behavior
 
 - Every open file has a stable tab identifier. Renaming a file or ancestor remaps paths without losing its buffer or undo stack.
@@ -326,7 +490,9 @@ still asks for native confirmation in Rust rather than in the webview.
 
 ## Security boundary
 
-Only the local main window receives the explicitly enumerated application commands and event/close permissions. No shell plugin, generic filesystem plugin permission, remote origin, or credential storage is exposed. Monaco workers, fonts, and application assets are bundled locally.
+Only the local main window receives the explicitly enumerated application commands and event/close permissions. No shell plugin and no generic filesystem plugin permission is exposed. Monaco workers, fonts, and application assets are bundled locally, and the content security policy still allows no remote origin at all: `connect-src` is IPC-only and `img-src` is `'self' data:`, so the webview cannot reach the network even now that the application can.
+
+Two of these sentences changed in Milestone 8 and the change is worth stating plainly. TBCE now makes network requests and now stores a credential. Both are confined to Rust: requests are built by `GitHubService` from a workspace identifier and a page number, so the webview cannot name a host, a path, a header or a URL; and the token is kept in the Windows Credential Manager, written only after GitHub accepts it, read per operation, never returned by any command, and scrubbed out of every message. Nothing writes a secret into the repository or into application data, because `.tbce/project.json` lives inside the user's own repository and application data is unencrypted JSON.
 
 Reopening a recent project is the one command that accepts an absolute path from the webview instead of a native picker. The path can only come from a folder this application already opened, and opening it still canonicalizes and checks the path exactly as the picker path does. Editor operations and snapshot source reads stay confined to the open workspace. Stack operations resolve opaque IDs beneath a backend-owned application-data directory. New-project writes use a native-picked parent; the webview cannot supply a destination path.
 
@@ -338,4 +504,4 @@ These checks protect ordinary local editing. They do not provide an OS-level san
 
 ## Future services
 
-SQLite should arrive with an actual persistence requirement. `GitService` now exists as an independent service; `GitHubService` remains a future one. UI components must continue to call service APIs. ArchitectureService is implemented independently of the editor and project metadata service.
+SQLite should arrive with an actual persistence requirement; the GitHub conditional-request cache is deliberately in memory rather than a first reason to add one. `GitService` and `GitHubService` now both exist as independent services. UI components must continue to call service APIs. ArchitectureService is implemented independently of the editor and project metadata service.

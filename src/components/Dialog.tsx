@@ -28,7 +28,10 @@ function DialogContent({ request }: { request: DialogRequest }) {
         <p>{request.message}</p>
         {request.input !== undefined && (
           <input
-            aria-label="Name"
+            aria-label={request.label ?? 'Name'}
+            type={request.secret ? 'password' : 'text'}
+            autoComplete={request.secret ? 'off' : undefined}
+            spellCheck={request.secret ? false : undefined}
             autoFocus
             value={value}
             onChange={(e) => setValue(e.target.value)}

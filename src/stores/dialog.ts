@@ -3,6 +3,11 @@ export interface DialogRequest {
   title: string;
   message: string;
   input?: string;
+  /// Names the input for assistive technology. Defaults to Name, which is what most prompts ask for.
+  label?: string;
+  /// Masks the input and turns off autocompletion. A secret answer is resolved to the caller and
+  /// never kept here: the typed value lives in the dialog component and dies with it.
+  secret?: boolean;
   actions: { label: string; value: string; danger?: boolean }[];
 }
 interface DialogState {

@@ -304,6 +304,13 @@ installer was **not** installed or exercised in this session.
 3. `git clone --progress=false` is rejected by Git, which takes no value for that
    option. Caught by the clone test and corrected to `--no-progress`.
 
+4. The first package was built before `src-tauri/src/git/mod.rs` was normalized to LF, which
+   the repository's `.gitattributes` requires and which `git` warned about. Normalizing it
+   changed the source fingerprint, so the manifest no longer described the bytes that installer
+   was compiled from. Both the manifest and the installer were regenerated rather than the
+   mismatch being explained away: a build identity that does not match its manifest is not a
+   build identity.
+
 ### Not verified
 
 - Installed-app behaviour of anything in this milestone. No Git operation has been
@@ -597,6 +604,185 @@ acceptance directory; the two catalog directories were empty before testing.
 Execution is ongoing. Per-check Expected, Observed, Evidence and Status are recorded
 in [the current result ledger](evidence/desktop-acceptance-2026-09-17/resumed-001/results.json).
 P10/P11/P12 remain unchecked until their complete installed-app scenarios pass.
+
+## Milestone 8 — GitHub connection, September 17, 2026
+
+Read-only GitHub repository context is implemented and covered by automated tests against a mock
+GitHub API. **This is not desktop acceptance.** No installed-app scenario ran in this session, no
+real GitHub request was made, Milestone 6 gate items P10, P11 and P12 remain open, and the new
+checks 67-74 are added to the [manual run-sheet](acceptance-runsheet-m6.md) unexecuted.
+
+### Scope decisions
+
+All four were confirmed by the user before implementation and are recorded in the
+[delivery checklist](milestone-8.md).
+
+1. **Authentication** is a Personal Access Token validated against `GET /user` and kept in the
+   Windows Credential Manager. OAuth device flow would need a registered GitHub application and a
+   client identifier in the source; reusing the token Git Credential Manager holds would give no
+   promise of API scopes and no account to manage.
+2. **Breadth** is the connection plus Overview, Branches, Commits and repository activity. Issue
+   and pull request lists stay in Milestones 9 and 10.
+3. **Proof** is a mock GitHub API on a local socket, so pagination, rate limits, `401`/`403`/`404`,
+   `ETag`/`304`, oversized answers, timeouts and Unicode are exercised with no network and no token
+   in CI.
+4. **Desktop acceptance** continues under the Milestone 4-7 waiver, with its reason restated.
+
+### Desktop acceptance waiver, and what changed about it
+
+Desktop automation is **no longer unavailable**. The
+[resumed run](#installed-app-acceptance-resumed--september-17-2026-0016-0300) discovered the
+application, installed it and passed check 1 against the fixed installer. The 45 remaining checks
+are unexecuted because the package under test crashed at startup, which was fixed in that same run.
+The waiver therefore still applies, but its justification is now "45 checks unexecuted, one recorded
+pass" rather than a missing Computer Use pipe. Repeating the old claim would have been false. No
+desktop checkbox was ticked anywhere on the strength of this work.
+
+### Automated verification
+
+Every command below exited 0. Raw output:
+[automated checks](evidence/m8-github/automated-checks.log).
+
+| Check                                       | Before | After | Result |
+| ------------------------------------------- | ------ | ----- | ------ |
+| `npm run format:check`                      | —      | —     | Pass   |
+| `npm run lint`                              | —      | —     | Pass   |
+| `npx tsc -b`                                | —      | —     | Pass   |
+| `npm test`                                  | 111    | 146   | Pass   |
+| `cargo fmt --check`                         | —      | —     | Pass   |
+| `cargo clippy --all-targets -- -D warnings` | —      | —     | Pass   |
+| `cargo test --locked`                       | 82     | 107   | Pass   |
+
+Twenty-five new Rust tests and thirty-five new frontend tests. Environment: Git
+2.54.0.windows.1, Node 24.15.0, npm 11.12.1, Cargo 1.96.0, Windows.
+[Source manifest](evidence/m8-github/source-manifest.txt) fingerprints the tested tracked and
+untracked sources, excluding `docs/` and `README.md`; 102 entries, up from 95. Manifest SHA-256:
+`086D9B855FA0706EBCA161F9715665CEC7FA543C80ED558B37CDEB4644036A15`.
+
+Two dependencies were added and `Cargo.lock` is committed with them, because CI runs
+`cargo test --locked`: `ureq` 2.12.1 with `native-certs`, and `keyring` 3.6.3 with `windows-native`
+under `[target.'cfg(windows)'.dependencies]`. `ureq` was chosen over `reqwest` — which `tauri`
+already carries transitively, but with no TLS stack enabled, so either choice adds one — because it
+is purely synchronous and drops into the existing `spawn_blocking` plus `std::sync::Mutex` pattern
+with no async-mutex question and no `reqwest::blocking`-inside-a-runtime hazard. It also honours
+`HTTPS_PROXY`, which matches how the Git service defers to the user's environment.
+
+### What the new tests actually assert
+
+The Rust tests drive a mock GitHub API built from `std::net::TcpListener` in the module's own test
+block, adding no test dependency — the same move as the bare-local-remote trick that proves fetch,
+pull and push without a network. It hands out canned status lines, headers and bodies in order and
+records what it received, so a test states exactly what GitHub is pretending to do and can then
+assert what TBCE sent. The ones worth naming, because they encode decisions rather than restating
+the code:
+
+- A token is stored **only** after `GET /user` accepts it, and a rejected token leaves an existing
+  working token untouched. Replacing a working credential with a typo would be its own failure.
+- A malformed token is refused before anything is sent, asserted by the mock server recording zero
+  requests. A token travels in a header, so a control character would corrupt the request rather
+  than fail it cleanly.
+- A revoked token is dropped and reported as signed out, so the panel offers to connect again
+  instead of repeating a failure nobody can act on.
+- A signed-out service reads nothing and asks nothing: the repository call fails with
+  `GITHUB_SIGNED_OUT` and the mock server records no request at all.
+- `hasMore` comes from the `Link` header, asserted by a **full** page with no `Link` header being
+  reported as having nothing more. Inferring it from the page size would have looked correct until
+  a repository had exactly thirty branches.
+- A conditional request is proven by the second request carrying the `If-None-Match` the first
+  answer set, and by a `304` with an empty body still producing the repository.
+- An exhausted rate limit reports its reset time; a `403` that is _not_ a rate limit stays a
+  refusal and keeps GitHub's own explanation, such as a SAML message.
+- A crafted remote (`..`, a path separator, a query string, a space) and a crafted reference
+  (`main&per_page=100`) are refused before anything is sent, asserted by zero recorded requests.
+- A token never reaches a message, asserted against an answer that deliberately echoes it: the
+  message contains `***` and not the token.
+- The production constructor pins `https://api.github.com`, so the injectable base used by the
+  tests cannot become a way to redirect a packaged build.
+- Every GitHub remote form parses to the same owner and repository, including scp-style, a port and
+  userinfo; a GitLab remote, a Windows path, a `file://` URL and a bare owner are all read as not a
+  GitHub repository rather than guessed at.
+- The credential vault itself round-trips a token under a disposable service name, so the Windows
+  path is proven and not only the trait. Clearing an entry that is already gone is not a failure.
+
+The frontend tests use the same mocked-adapter pattern as the Git store and panel. The notable ones:
+
+- Opening a folder reads the Git remote and asks GitHub nothing, asserted by requiring zero calls
+  to the account and repository commands.
+- Switching tabs runs nothing at all, asserted by clearing the mocks and requiring zero calls. One
+  refresh reads everything the panel shows, which is what makes that true.
+- A read in flight disables paging but never disconnecting, which is the reason the store keeps two
+  busy flags instead of one.
+- Refused activity leaves the rest of the refresh intact, with the section explained rather than
+  the whole panel failing.
+- A token never reaches `localStorage` or the rendered document, asserted after a successful
+  sign-in.
+- Opening another folder keeps the account and forgets the repository.
+
+### Production bundle
+
+The development-only harness is still excluded, and a new check was added for this milestone: the
+GitHub host appears nowhere in the bundle, because the webview names commands and never endpoints.
+[Bundle inspection](evidence/m8-github/production-bundle-exclusion.txt). The panel ships in the main
+entry chunk beside the other eagerly imported panels; the lazy chunks are unchanged. The content
+security policy was not touched, which is why the panel shows a login name and no avatar.
+
+### A deliberate negative check
+
+The registration test was proven to fail. Removing `allow-github-commits` from
+`capabilities/main.json` makes it report `github_commits is missing from the main window
+capability`, and restoring the entry makes it pass. That test was also **generalized** in this
+milestone, which is a correction rather than an improvement: see below.
+
+### Packaging
+
+`npm run tauri build -- --target x86_64-pc-windows-msvc` exited 0. Installer:
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`,
+SHA-256 `8D30A640B3583CB16EA2BA5F4C27E8CB07EDA690293F14046BD8968A61991081`. It was **not** installed
+or exercised in this session.
+
+An earlier package of the same code, SHA-256
+`EF10DDB58A4A3DDA38B7EC133F9DC2395C28658D665B9BE7E91827889E3155FF`, is superseded and must
+not be quoted as this milestone's build; see correction 5. The frontend bundle is
+byte-identical between the two, so the bundle inspection above holds for both.
+
+### Corrections made during this work
+
+1. The registration test scanned for `pub async fn git_` and would have read `github_account` as a
+   Git command named `hub_account`, then asserted that a command called `git_hub_account` was
+   registered — failing on a correctly registered command while checking a name that does not
+   exist. It now scans every `pub async fn` in `commands/mod.rs` and checks all 54 commands against
+   the invoke handler, the build-time list and the window capability. That required a trailing comma
+   on the last `generate_handler!` entry, which the macro accepts.
+2. The first version of the panel used one busy flag for everything, so loading commits disabled the
+   Disconnect button. That contradicted the store's own stated design and would have trapped a user
+   whose read was stalled or rate-limited, which is precisely when they would want to disconnect.
+   Found by a test written from the design rather than from the code; the panel was fixed, not the
+   test.
+3. A first draft of the bundle evidence combined two `grep` patterns into one command, so the
+   transcript showed a match while the narrative claimed the API host was absent. The claim was
+   true but unproven by what was recorded, so the evidence was regenerated with one `grep` per
+   claim. Evidence that does not support its own sentence is worse than no evidence.
+4. Three store tests released a deferred promise before the operation had reached the deferred
+   call, because a refresh reads the Git remote first. They now wait for the deferred call to be the
+   one in flight. The tests were wrong, not the sequencing.
+
+### Not verified
+
+- Installed-app behaviour of anything in this milestone. No GitHub operation has been performed
+  through the packaged application, and no panel has been rendered in WebView2.
+- **Any real GitHub request.** Every automated test answers from a local socket. The live API's
+  actual field values, its pagination behaviour on large repositories, its activity endpoint's real
+  access requirements, secondary rate limits and abuse detection are all unexercised.
+- Acceptance checks 67-74, and the still-open 15-42 and 57-66.
+- Real TLS: the mock server speaks plain HTTP on loopback, so certificate verification, the
+  `native-certs` trust store and a corporate proxy or TLS-inspecting middlebox are untested.
+- A fine-grained token, a GitHub Enterprise host, an organization with SAML enforcement, and a
+  repository large enough to page more than twice.
+- Layout at 1280 × 820 and at the minimum 800 × 540 window size. No screenshot or rendering check
+  was possible.
+- Operating systems other than Windows. The credential vault reports
+  `CREDENTIALS_UNSUPPORTED` elsewhere by design, and that path has not been compiled or run.
+- Installer upgrade and uninstall, signing, and release ownership.
 
 ## Build notes
 

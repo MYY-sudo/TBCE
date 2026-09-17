@@ -927,6 +927,19 @@ impl GitService {
             .collect())
     }
 
+    /// The name and URL of the remote an operation would talk to, or nothing when there is none.
+    /// Remote identity is read here rather than accepted from the webview, which is what lets the
+    /// GitHub service work out which repository the open folder belongs to.
+    pub fn remote_url(&self) -> Result<Option<(String, String)>> {
+        let remote = match self.remote_of(None) {
+            Ok(remote) => remote,
+            Err(error) if error.code == "NO_REMOTE" => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let capture = self.run(&["remote", "get-url", "--", &remote], NO_TABLE)?;
+        Ok(Some((remote, text(&capture).trim().to_string())))
+    }
+
     /// Checks the configured URL before every exchange, so a remote that was reconfigured to an
     /// executable transport after cloning still cannot run one.
     fn checked_remote(&self, explicit: Option<&str>) -> Result<String> {
@@ -2011,9 +2024,11 @@ mod tests {
 
     /// A Tauri command needs four edits in lockstep: the function, the invoke handler, the
     /// build-time manifest and the window capability. Missing the last two fails only at runtime
-    /// in the packaged app, so the four lists are compared here instead.
+    /// in the packaged app, so the four lists are compared here instead. Every command is checked,
+    /// not only this module's: the prefix filter this test used to carry read `github_account` as a
+    /// Git command called `hub_account`.
     #[test]
-    fn every_git_command_is_registered_in_all_four_places() {
+    fn every_command_is_registered_in_all_four_places() {
         let commands = include_str!("../commands/mod.rs");
         let handler = include_str!("../lib.rs");
         let manifest = include_str!("../../build.rs");
@@ -2021,26 +2036,35 @@ mod tests {
 
         let names: Vec<&str> = commands
             .lines()
-            .filter_map(|line| line.trim().strip_prefix("pub async fn git_"))
+            .filter_map(|line| line.trim().strip_prefix("pub async fn "))
             .filter_map(|rest| rest.split('(').next())
             .collect();
         assert!(
-            names.len() >= 14,
-            "expected the Git command surface, found {names:?}"
+            names.len() >= 46,
+            "expected the whole command surface, found {} in {names:?}",
+            names.len()
+        );
+        assert!(
+            names.iter().any(|name| name.starts_with("git_")),
+            "expected the Git commands among {names:?}"
+        );
+        assert!(
+            names.iter().any(|name| name.starts_with("github_")),
+            "expected the GitHub commands among {names:?}"
         );
         for name in names {
             let kebab = name.replace('_', "-");
             assert!(
-                handler.contains(&format!("commands::git_{name},")),
-                "git_{name} is missing from the invoke handler"
+                handler.contains(&format!("commands::{name},")),
+                "{name} is missing from the invoke handler, or is its last entry and has no comma"
             );
             assert!(
-                manifest.contains(&format!("\"git_{name}\",")),
-                "git_{name} is missing from the build-time command list"
+                manifest.contains(&format!("\"{name}\",")),
+                "{name} is missing from the build-time command list"
             );
             assert!(
-                capability.contains(&format!("\"allow-git-{kebab}\"")),
-                "git_{name} is missing from the main window capability"
+                capability.contains(&format!("\"allow-{kebab}\"")),
+                "{name} is missing from the main window capability"
             );
         }
     }

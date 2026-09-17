@@ -1090,6 +1090,186 @@ kbd {
   font-size: 11px;
 }
 
+/* GitHub repository context. Follows the source control panel, with a tab strip of its own
+   because the editor tabs belong to open files. */
+.github-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 9px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.github-content > p {
+  margin: 2px 4px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.github-content > button {
+  justify-content: center;
+  white-space: normal;
+}
+.github-account,
+.github-repository {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #23272e;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.github-login,
+.github-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.github-login svg {
+  flex-shrink: 0;
+  color: #8f9d8a;
+}
+.github-account > button,
+.github-repository > button {
+  margin-left: auto;
+}
+.github-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #2b3037;
+  padding-bottom: 6px;
+}
+.github-tabs button {
+  flex: 1;
+  justify-content: center;
+  font-size: 11px;
+  padding: 4px 6px;
+  color: #a7aeb8;
+}
+.github-tabs button.selected {
+  background: #2a2f37;
+  color: #f2f4f6;
+}
+.github-section {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 0 4px 6px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 1.1px;
+  color: #a7aeb8;
+  border-bottom: 1px solid #2b3037;
+}
+.github-section > span {
+  color: #606875;
+  letter-spacing: 0;
+}
+.github-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.github-label {
+  color: #606875;
+  flex-shrink: 0;
+}
+.github-value {
+  color: #d4d8df;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.github-description {
+  color: #a7aeb8;
+}
+.github-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 4px;
+}
+.github-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #9fb3c8;
+  background: #23272e;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.github-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: #9fb3c8;
+}
+.github-counts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.github-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  font-size: 11px;
+  min-width: 0;
+}
+.github-row svg {
+  flex-shrink: 0;
+  color: #8f9d8a;
+}
+.github-row .github-value {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.github-commit {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 7px;
+  padding: 4px;
+  font-size: 11px;
+  min-width: 0;
+}
+.github-commit .github-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.github-commit .github-meta {
+  grid-column: 2;
+}
+.github-oid {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  color: #8f9d8a;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.github-meta {
+  color: #606875;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.github-rate {
+  margin-top: auto;
+  padding-top: 8px;
+}
+.github-empty {
+  color: #606875;
+  padding: 2px 4px;
+}
+
 /* Development-only Git harness. Removed from production builds with its component. */
 .git-harness {
   border-top: 1px solid var(--border);

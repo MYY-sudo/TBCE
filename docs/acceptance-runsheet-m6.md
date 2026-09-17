@@ -1,10 +1,11 @@
-# Manual acceptance run-sheet — installed-app checks 15–42 and 57–66
+# Manual acceptance run-sheet — installed-app checks 15–42, 57–66 and 67–74
 
 Run these checks against the installed TBCE application on Windows, by hand or
 through working desktop automation. Checks 15–42 cover P10 of the
 [Milestone 6 prerequisite gate](milestone-6.md). P11 covers the earlier editor
 scenarios identified separately below. Checks 57–66 cover the Milestone 7
-source-control panel and were added on September 16, 2026. Recording blocked
+source-control panel and were added on September 16, 2026. Checks 67–74 cover the
+Milestone 8 GitHub panel and were added on September 17, 2026. Recording blocked
 checks does not complete acceptance or close the gate.
 
 Checks 43–56 exercised the Git backend through the development harness. The
@@ -27,7 +28,10 @@ instead; they cover the same ground through the interface a user actually has.
    example `Masaüstü deneme ğüşıöç`. Keep it away from anything you care about.
 3. Use disposable stack/architecture catalogs without deleting personal entries.
    Preserve any existing application data before testing empty or damaged libraries.
-   Use a local bare remote and two disposable clones for check 64. Scope missing-Git
+   Use a local bare remote and two disposable clones for check 64. For checks 67–74
+   you need a GitHub account and a token you create for the run and revoke when you
+   finish; prefer a fine-grained token limited to Metadata: Read and Contents: Read.
+   Never commit a token and never paste one into a project file. Scope missing-Git
    PATH changes to the test application process and identity changes to test Git
    configuration; do not rename the installed Git executable or edit global settings.
 4. Record the build identity once, then fill in one row per check. If a fix changes
@@ -61,15 +65,16 @@ and stop treating that area as verified; do not adjust the expectation to match.
 
 ## What to run
 
-| Group                  | Checks          | Covers                                                                                                                           |
-| ---------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Editor gate (P11)      | 2, 7, 9, 10, 13 | Native file picker, dirty-exit prompts, Recycle Bin deletion/restoration, save-conflict UI, minimum-size layout                  |
-| Additional editor gaps | 11, 12          | Missing files, read-only saves, unsupported files, invalid names and collisions                                                  |
-| Terminal               | 15–22           | Opening, working directory, Turkish output, Ctrl+C, resizing, scrollback, restart, orphaned processes                            |
-| Project system         | 23–27           | Creation, conversion, Recent list, missing folders, corrupt manifests                                                            |
-| Saved stacks           | 28–35           | Capture defaults, unsaved buffers, creation, replacement, deletion, damaged definitions, layout                                  |
-| Architectures          | 36–42           | Catalog persistence, structure editing, previews, conflicts, deletion, layout                                                    |
-| Git UI                 | 57–66           | Detection, initialization, missing Git, status, staging, commits, conflicts, branches, remotes, clone, previews, history, layout |
+| Group                  | Checks          | Covers                                                                                                                                                  |
+| ---------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editor gate (P11)      | 2, 7, 9, 10, 13 | Native file picker, dirty-exit prompts, Recycle Bin deletion/restoration, save-conflict UI, minimum-size layout                                         |
+| Additional editor gaps | 11, 12          | Missing files, read-only saves, unsupported files, invalid names and collisions                                                                         |
+| Terminal               | 15–22           | Opening, working directory, Turkish output, Ctrl+C, resizing, scrollback, restart, orphaned processes                                                   |
+| Project system         | 23–27           | Creation, conversion, Recent list, missing folders, corrupt manifests                                                                                   |
+| Saved stacks           | 28–35           | Capture defaults, unsaved buffers, creation, replacement, deletion, damaged definitions, layout                                                         |
+| Architectures          | 36–42           | Catalog persistence, structure editing, previews, conflicts, deletion, layout                                                                           |
+| Git UI                 | 57–66           | Detection, initialization, missing Git, status, staging, commits, conflicts, branches, remotes, clone, previews, history, layout                        |
+| GitHub                 | 67–74           | Connecting and disconnecting an account, credential storage, remote states, overview values, branch and commit paging, revoked tokens, refusals, layout |
 
 Earlier records do not close the P11 scenarios above. Rerun those checks, including
 their cancellation/error paths, and retain checks 11–12 from the original sheet.
@@ -94,6 +99,10 @@ Send the filled-in sheet back, or paste it into
 [verification.md](verification.md) under a new dated heading. Mark P10 only when
 every check 15–42 passes, P11 only when all its editor scenarios pass, and P12 only
 when all prerequisite failures are resolved and the gate passes. Track 57–66
-separately as Git UI acceptance. A filled-in sheet containing fail or blocked
-results is not a passing gate. Until the relevant checks pass, the Git backend and
-panel remain **implemented and covered by automated tests, but not desktop-accepted**.
+separately as Git UI acceptance and 67–74 as GitHub acceptance. A filled-in sheet
+containing fail or blocked results is not a passing gate. Until the relevant checks
+pass, the Git backend, the source-control panel and the GitHub panel all remain
+**implemented and covered by automated tests, but not desktop-accepted**.
+
+Revoke the token you created for checks 67–74 as soon as you are finished, and
+disconnect the account in TBCE so nothing is left in the credential vault.

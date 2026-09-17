@@ -512,9 +512,31 @@ versions, which belongs to a later milestone if it is wanted at all.
 
 **Goal:** Connect local projects with remote repository context.
 
+Execution tracking: [Milestone 8 checklist](milestone-8.md).
+
+**Delivered September 17, 2026** as a read-only `GitHubService` in Rust, eight `github_*`
+commands, a typed adapter, a Zustand store and a GitHub panel in the activity bar. Four
+scope decisions were confirmed before implementation: authentication is a personal access
+token kept in the Windows Credential Manager rather than OAuth device flow, which would
+need a registered GitHub application; the milestone covers the connection plus Overview,
+Branches, Commits and repository activity, leaving issue and pull request lists to
+Milestones 9 and 10; automated tests run against a mock GitHub API on a local socket, so no
+network or token is needed in CI; and the milestone proceeds under the same desktop-acceptance
+waiver used for Milestones 4 to 7. Under that waiver this milestone is covered by automated
+tests but is **not desktop-accepted**: installed-app checks 67-74 wait in the
+[manual run-sheet](acceptance-runsheet-m6.md) and the Milestone 6 gate items P10-P12 stay
+open. See the [verification record](verification.md).
+
 Start only with GitHub. Do not support GitLab and Bitbucket yet.
 
 Authentication should eventually use OAuth or another secure method. Never store secrets in the repository.
+
+A token is the secure method this release uses: it is kept in the operating system credential
+vault, written only after GitHub accepts it, read per operation, never returned to the
+interface and never written into the repository or into application data. Every request is
+built in Rust from a workspace identifier and a page number, so the webview names no host,
+path, header or URL, and the content security policy still allows the webview no remote
+origin at all.
 
 Display:
 
@@ -536,6 +558,14 @@ Suggested tabs:
 - Issues
 - Pull Requests
 - Commits
+
+Three of these shipped: Overview, Branches and Commits, with repository activity on the
+Overview. Issues and Pull Requests belong to Milestones 9 and 10, which own them. Code was
+left out deliberately: the working copy is already on disk and in the explorer, so a remote
+file browser would duplicate it. The Overview reports the one count GitHub returns, labelled
+as open issues **and** pull requests together, because GitHub counts a pull request as an
+issue and a field named after issues alone would be wrong in any repository with an open
+pull request.
 
 ### Phase 10 — Issues
 
