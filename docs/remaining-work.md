@@ -72,7 +72,7 @@
 
 - Complete installed-app acceptance checks 67-74: connecting and disconnecting an account, credential storage confirmed in Windows Credential Manager, the three remote states, Overview values checked against github.com, branch and commit paging, a revoked token, refusals, and layout at the minimum window size.
 - Exercise the real API. Every automated test answers from a mock server on loopback, so live field values, pagination on a large repository, the activity endpoint's real access requirements, secondary rate limits and abuse detection are all unexercised. Real TLS, the bundled `native-certs` trust store and a TLS-inspecting proxy are untested for the same reason.
-- Add issue and pull request lists in Milestones 9 and 10. The Overview shows the single count GitHub reports, which counts pull requests as issues; separate counts need those milestones.
+- Add the pull request list in Milestone 10. Issues have their own tab as of Milestone 9; the Overview still shows the single count GitHub reports, which counts pull requests as issues.
 - Decide whether a Code tab is worth having. The roadmap suggests one, and it was left out because it would duplicate the explorer for a working copy already on disk.
 - Support GitHub Enterprise hosts. Only github.com is recognized; another host is reported as a state rather than attempted.
 - Consider showing avatars. The content security policy allows no remote image, so this needs either a widened `img-src` or Rust fetching the bytes and handing over a data URL.
@@ -81,23 +81,37 @@
 - Reconsider the conditional-request cache if it ever needs to survive a restart. It is in memory, cleared wholesale, and exists to spare the rate limit rather than to be a store.
 - Translate the panel with the rest of the interface in Milestone 14. Its strings are English and inlined, like every other component.
 
+## Within GitHub issues
+
+- Complete installed-app acceptance checks 75-82: lists and paging against github.com, the three filters, plain-text bodies, creating with labels, assignees and a milestone, closing with each reason, reopening, read-only and missing-access refusals, disabled issues, network loss during a create, and layout at the minimum window size. They change a real repository, so they need a disposable one.
+- Exercise the real API. As in Milestone 8, every automated test answers from a mock server, so GitHub's actual behaviour when it silently drops labels, assignees or a milestone, its secondary rate limits on creating content, and its `422` details are unexercised against the live service.
+- Add comments, which the roadmap defers. The issue view shows the comment count only.
+- Consider editing an issue's title, body, labels, assignees and milestone after creation, locking, pinning, transferring and deleting. None of these exist; only create, close and reopen write anything.
+- Decide whether bodies should be rendered as Markdown. They are plain text by choice, which needs no parser or sanitizer; rendering would need both, and images would still be blocked by the content security policy.
+- Consider sorting, searching and more filters: author, mentions, several labels at once, and closed milestones. The list uses GitHub's default order, newest first; the label filter takes one label, and a label whose name contains a comma would be read by GitHub as two.
+- Consider more than 500 labels, assignees or milestones. The pickers read at most five pages of a hundred each and say so when a list stops there.
+- Reconsider a write that is not confirmed. A create that times out after it may have reached GitHub is reported as unconfirmed and never retried, so the user checks with Refresh; an idempotency key would need GitHub support that does not exist.
+- A change whose answer arrives after the workspace was switched is still made on GitHub; only its display is discarded. The target repository is resolved when the command starts, so the change always lands where it was aimed.
+- Translate the tab with the rest of the interface in Milestone 14.
+
 ## Product roadmap
 
 The [Milestone 6 delivery checklist](milestone-6.md) records the delivered backend
 against its evidence. G01-G11 and V01-V06 are complete; the prerequisite gate items
 P10-P12 are not. The [Milestone 7 checklist](milestone-7.md) records the panel over
-it, and the [Milestone 8 checklist](milestone-8.md) the GitHub context beside it. The
+it, the [Milestone 8 checklist](milestone-8.md) the GitHub context beside it, and the
+[Milestone 9 checklist](milestone-9.md) the issues added to that context. The
 [manual run-sheet](acceptance-runsheet-m6.md) now covers installed-app checks 15-42,
-57-66 and 67-74. Desktop automation itself works again — the September 17 resumed run
-installed the application and passed check 1 — so what is outstanding is the 45
-unexecuted checks rather than a broken tool. Automated tests prove the code and prove
+57-66, 67-74 and 75-82. Desktop automation itself works again — the September 17 resumed
+run installed the application and passed check 1 — so what is outstanding is the 45
+unexecuted checks plus the eight Milestone 9 added, 53 in all, rather than a broken tool. Automated tests prove the code and prove
 nothing about the packaged application. Complete the run-sheet before treating any of
 this as desktop-verified.
 
 See the [full product vision and V1/V2 roadmap](roadmap.md) for every milestone, completion criteria, and security requirement.
 
-Milestone 5's personal architectures, Milestone 6's Git backend, Milestone 7's source-control panel and Milestone 8's GitHub context are implemented with automated coverage; desktop acceptance remains pending alongside earlier milestones. Next: issues, pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
+Milestone 5's personal architectures, Milestone 6's Git backend, Milestone 7's source-control panel, Milestone 8's GitHub context and Milestone 9's GitHub issues are implemented with automated coverage; desktop acceptance remains pending alongside earlier milestones. Next: pull requests, dashboard, progress, project commands, settings, and stabilization in the supplied milestone order. Milestone 13 should run project commands through the existing `ProcessService` rather than adding a second way to execute programs.
 
-Desktop acceptance checks 15-27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28-35, the Git UI checks 57-66 and the GitHub checks 67-74. Checks 43-56 targeted the backend through the development harness; the panel now covers the same ground through the real interface, so 57-66 replace them. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
+Desktop acceptance checks 15-27 for the corrected terminal and project system remain outstanding alongside Milestone 4 checks 28-35, the Git UI checks 57-66, the GitHub checks 67-74 and the GitHub issues checks 75-82. Checks 43-56 targeted the backend through the development harness; the panel now covers the same ground through the real interface, so 57-66 replace them. Implementation proceeded on the user's request after retrying Computer Use and finding the native pipe unavailable again. These milestones must not be treated as desktop-verified until those checks run. See `verification.md` for exact results and limitations.
 
 The current implementation does not claim V1 completion. Advanced automation remains outside the foundation/editor scope.

@@ -16,19 +16,22 @@ import {
 import { actions, useGitHub, type GitHubTab } from '../stores/github';
 import { useWorkspace } from '../stores/workspace';
 import { ask } from '../stores/dialog';
+import { IssuesTab } from './IssuesTab';
 import {
   accountLabel,
   dateLabel,
   rateLabel,
   scopeLabel,
 } from '../types/github';
-/// The token GitHub needs to read repository context, named where the user has to create it.
+/// The token GitHub needs, named where the user has to create it. Reading needs the first three
+/// permissions; changing issues needs Issues: Read and write.
 const SCOPES =
-  'Create a token at github.com/settings/tokens. A fine-grained token needs Metadata: Read and Contents: Read; a classic token needs repo for private repositories, or public_repo for public ones.';
+  'Create a token at github.com/settings/tokens. A fine-grained token needs Metadata: Read, Contents: Read and Issues: Read, or Issues: Read and write to create, close and reopen issues; a classic token needs repo for private repositories, or public_repo for public ones.';
 const tabs: { id: GitHubTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'branches', label: 'Branches' },
   { id: 'commits', label: 'Commits' },
+  { id: 'issues', label: 'Issues' },
 ];
 function Detail({ label, value }: { label: string; value: string }) {
   return (
@@ -105,8 +108,9 @@ export function GitHubPanel() {
           <>
             <p className="muted">
               Connect a GitHub account to read the repository behind this
-              project. TBCE reads and never writes, and the token is kept in the
-              Windows Credential Manager rather than in this project.
+              project. The only thing TBCE changes on GitHub is an issue, and
+              only when you create, close or reopen one. The token is kept in
+              the Windows Credential Manager rather than in this project.
             </p>
             <p className="muted">{SCOPES}</p>
             <button
@@ -251,9 +255,9 @@ export function GitHubPanel() {
                       </span>
                     </div>
                     <p className="github-meta">
-                      GitHub counts open issues and pull requests together.
-                      Separate lists arrive with the issue and pull request
-                      milestones.
+                      GitHub counts open issues and pull requests together. The
+                      Issues tab lists issues alone; pull requests arrive with
+                      their own milestone.
                     </p>
                     <div className="github-section">
                       ACTIVITY
@@ -295,6 +299,8 @@ export function GitHubPanel() {
                       </div>
                     ))}
                   </>
+                ) : tab === 'issues' ? (
+                  <IssuesTab busy={busy} />
                 ) : tab === 'branches' ? (
                   <>
                     <div className="github-section">

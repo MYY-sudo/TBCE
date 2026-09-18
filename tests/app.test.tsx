@@ -42,6 +42,12 @@ vi.mock('../src/services/github', () => ({
     branches: vi.fn(),
     commits: vi.fn(),
     activity: vi.fn(),
+    issues: vi.fn(),
+    issue: vi.fn(),
+    issueChoices: vi.fn(),
+    createIssue: vi.fn(),
+    closeIssue: vi.fn(),
+    reopenIssue: vi.fn(),
   },
 }));
 const repository = {
@@ -251,6 +257,7 @@ test.each(['GitHub', 'Toggle explorer'])(
       forks: 0,
       watchers: 0,
       openIssuesAndPullRequests: 0,
+      hasIssues: true,
       pushedAt: null,
       language: null,
       url: null,

@@ -1,0 +1,199 @@
+Milestone 9 - GitHub issues: automated checks
+Date: 2026-09-18
+Environment: Windows NT 10.0.26220; Node v24.15.0; npm 11.12.1; cargo 1.96.0 (30a34c682 2026-05-25); git version 2.54.0.windows.1
+Source: docs/evidence/m9-github-issues/source-manifest.txt (105 entries, docs/ and README.md excluded)
+Every command below was run from the repository root.
+
+$ npm.cmd run format:check
+
+> tbce@0.1.0 format:check
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+[exit 0]
+
+$ npm.cmd run lint
+
+> tbce@0.1.0 lint
+> eslint .
+
+[exit 0]
+
+$ npx tsc -b
+[exit 0]
+
+$ npm.cmd test
+
+> tbce@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/Users/mysf5/Masaüstü/TBCE
+
+
+ Test Files  13 passed (13)
+      Tests  201 passed (201)
+   Start at  19:13:35
+   Duration  5.22s (transform 2.85s, setup 4.88s, import 3.45s, tests 10.59s, environment 10.04s)
+
+[exit 0]
+
+$ cargo fmt --manifest-path src-tauri/Cargo.toml --check
+[exit 0]
+
+$ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.64s
+[exit 0]
+
+$ cargo test --manifest-path src-tauri/Cargo.toml --locked
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\tbce_lib-425c70551b7b7da3.exe)
+
+running 130 tests
+test filesystem::tests::accepts_turkish_names_without_locale_dependent_case_folding ... ok
+test architecture::tests::detects_file_directory_and_case_conflicts_in_stack_combination ... ok
+test git::tests::a_failed_invocation_is_classified_by_its_message ... ok
+test architecture::tests::rejects_unsafe_paths_duplicate_files_and_case_collisions ... ok
+test filesystem::tests::rejects_traversal_and_root_mutation ... ok
+test filesystem::tests::invalidates_old_workspace ... ok
+test filesystem::tests::failed_save_preserves_file ... ok
+test filesystem::tests::round_trip_preserves_bom_unicode_and_crlf ... ok
+test filesystem::tests::rejects_line_endings_monaco_would_silently_normalize ... ok
+test git::tests::credentials_never_reach_a_message ... ok
+test filesystem::tests::rejects_conflict_without_overwriting ... ok
+test filesystem::tests::creates_lists_renames_and_rejects_collisions ... ok
+test architecture::tests::catalog_survives_restart_and_edit_keeps_id ... ok
+test git::tests::every_command_is_registered_in_all_four_places ... ok
+test git::tests::executable_transport_sources_are_refused ... ok
+test filesystem::tests::rejects_binary_invalid_utf8_and_large_files ... ok
+test architecture::tests::corrupt_future_and_mismatched_definitions_are_warned_and_skipped ... ok
+test git::tests::invalid_branch_names_are_rejected_before_git_runs ... ok
+test architecture::tests::merged_preview_and_creation_agree_and_conflicts_leave_no_destination ... ok
+test git::tests::no_argument_list_writes_global_or_system_configuration ... ok
+test filesystem::tests::rejects_junctions ... ok
+test architecture::tests::rejects_junctions_in_library_and_generation_paths ... ok
+test git::tests::detects_nothing_outside_a_repository ... ok
+test architecture::tests::generates_empty_folders_text_and_fresh_metadata_independently ... ok
+test git::tests::a_commit_requires_a_message_and_staged_content ... ok
+test git::tests::initializes_a_repository_and_reports_an_unborn_branch ... ok
+test git::tests::an_external_diff_command_is_never_run ... ok
+test git::tests::a_repository_without_a_remote_reports_no_remote ... ok
+test git::tests::creating_a_branch_does_not_switch_to_it ... ok
+test github::issues::tests::a_crafted_filter_sends_nothing ... ok
+test github::issues::tests::a_pull_request_is_never_closed_or_reopened_through_the_issue_endpoint ... ok
+test github::issues::tests::a_revoked_token_during_a_write_clears_credentials_and_cache ... ok
+test github::issues::tests::a_single_issue_is_still_held_to_the_metadata_cap ... ok
+test github::issues::tests::a_title_of_exactly_the_limit_in_multibyte_characters_is_accepted ... ok
+test github::issues::tests::a_token_never_reaches_a_write_failure ... ok
+test git::tests::invalid_paths_are_rejected_before_git_runs ... ok
+test git::tests::reports_a_parent_repository_without_allowing_operations_inside_it ... ok
+test github::issues::tests::an_empty_body_and_empty_lists_are_not_sent ... ok
+test github::issues::tests::an_invalid_draft_or_number_sends_nothing ... ok
+test git::tests::a_commit_records_the_index_not_the_working_tree ... ok
+test github::issues::tests::choices_are_read_whole_up_to_the_page_limit_and_say_when_they_stop ... ok
+test github::issues::tests::choices_that_fit_are_not_reported_as_truncated ... ok
+test github::issues::tests::closing_sends_the_chosen_reason_and_reopening_sends_open ... ok
+test github::issues::tests::creating_posts_the_checked_draft_as_json ... ok
+test github::issues::tests::each_issue_failure_is_named_for_what_it_is ... ok
+test github::issues::tests::filter_values_are_encoded_so_a_label_cannot_add_a_parameter ... ok
+test github::issues::tests::labels_assignees_and_milestones_survive_the_round_trip ... ok
+test git::tests::staging_all_includes_deletions_and_unstaging_keeps_working_bytes ... ok
+test github::issues::tests::metadata_github_silently_left_out_is_reported ... ok
+test github::tests::a_crafted_reference_is_refused ... ok
+test github::issues::tests::pull_requests_are_left_out_while_paging_still_follows_the_link_header ... ok
+test github::tests::a_crafted_remote_cannot_reach_another_endpoint ... ok
+test github::tests::a_malformed_token_is_refused_before_anything_is_sent ... ok
+test github::tests::a_malformed_or_oversized_answer_is_refused_rather_than_trusted ... ok
+test github::tests::a_page_number_is_clamped_rather_than_trusted ... ok
+test github::tests::a_rejected_token_leaves_an_existing_one_untouched ... ok
+test github::tests::a_refusal_that_is_not_a_rate_limit_stays_a_refusal ... ok
+test github::tests::a_remote_somewhere_else_is_a_state_not_a_github_repository ... ok
+test github::issues::tests::an_issue_page_may_exceed_the_metadata_cap_and_is_then_not_cached ... ok
+test git::tests::branches_report_the_current_branch_and_the_holding_worktree ... ok
+test github::tests::a_signed_out_service_reads_nothing_and_asks_nothing ... ok
+test github::tests::a_revoked_token_is_dropped_and_reported_as_signed_out ... ok
+test github::tests::a_token_is_stored_only_after_github_accepts_it ... ok
+test github::tests::a_token_never_reaches_a_message ... ok
+test github::tests::a_revoked_token_during_any_repository_read_clears_credentials_and_cache ... ok
+test github::tests::an_exhausted_rate_limit_reports_when_it_resets ... ok
+test github::tests::an_unchanged_answer_is_reused_without_being_resent ... ok
+test github::tests::another_page_is_advertised_by_the_link_header_not_by_the_page_size ... ok
+test github::tests::classic_token_scopes_are_reported_and_a_fine_grained_token_reports_none ... ok
+test github::tests::every_remote_form_github_uses_is_recognized ... ok
+test github::tests::nothing_in_this_module_prints ... ok
+test github::tests::repository_fields_and_the_rate_limit_survive_the_round_trip ... ok
+test github::tests::only_the_specific_empty_repository_conflict_becomes_an_empty_commits_page ... ok
+test github::tests::signing_out_removes_the_credential ... ok
+test github::tests::each_failing_status_maps_to_its_own_code ... ok
+test github::tests::the_production_service_talks_only_to_github_over_https ... ok
+test github::tests::the_credential_vault_round_trips_a_token ... ok
+test github::tests::unicode_survives_names_and_commit_messages ... ok
+test github::tests::watchers_use_subscribers_and_do_not_fall_back_to_stars ... ok
+test process::tests::a_missing_program_is_reported_as_not_found ... ok
+test git::tests::diffs_report_binary_files_renames_and_line_counts ... ok
+test process::tests::bounded_output_is_truncated_rather_than_unbounded ... ok
+test process::tests::decodes_multibyte_output_split_across_reads ... ok
+test process::tests::captures_separate_streams_and_the_exit_code ... ok
+test git::tests::committing_a_conflicted_index_is_refused ... ok
+test process::tests::accepts_input_and_stops_a_running_shell ... ok
+test process::tests::working_directory_converts_only_verbatim_drive_paths ... ok
+test project::tests::detection_keeps_the_existing_json_shape ... ok
+test project::tests::detects_nothing_in_a_plain_folder ... ok
+test project::tests::init_refuses_an_existing_project_and_update_refuses_a_missing_one ... ok
+test project::tests::init_writes_a_manifest_that_detect_reads_back ... ok
+test git::tests::checkout_is_refused_while_the_worktree_is_dirty ... ok
+test project::tests::project_detection_makes_no_claim_about_git ... ok
+test project::tests::rejects_blank_names ... ok
+test process::tests::the_environment_is_changed_only_for_the_child ... ok
+test process::tests::spawns_inside_the_requested_directory ... ok
+test project::tests::reports_unreadable_manifests_instead_of_failing ... ok
+test project::tests::update_replaces_every_field ... ok
+test templates::tests::collisions_invalid_names_and_missing_stacks_leave_destinations_untouched ... ok
+test templates::tests::corrupt_and_future_catalog_entries_are_skipped ... ok
+test templates::tests::defaults_omit_metadata_and_deselect_dependencies_and_environment_files ... ok
+test templates::tests::corrupt_snapshot_fails_before_destination_is_created ... ok
+test templates::tests::explicit_selection_can_include_an_environment_file ... ok
+test git::tests::status_reports_renames_deletions_untracked_and_turkish_paths ... ok
+test process::tests::a_child_that_outlives_its_limit_is_stopped ... ok
+test git::tests::status_separates_staged_and_unstaged_changes_to_one_file ... ok
+test project::tests::metadata_junctions_are_rejected_for_reads_and_writes ... ok
+test git::tests::unstaging_works_before_the_first_commit ... ok
+test templates::tests::rejects_traversal_metadata_and_duplicate_selections_without_publishing ... ok
+test templates::tests::failed_replacement_retains_the_published_snapshot ... ok
+test tests::managed_services_have_distinct_state_keys ... ok
+test templates::tests::junctions_are_blocked_in_sources_and_library_paths ... ok
+test terminal::tests::restart_replaces_the_session_and_stop_all_clears_them ... ok
+test git::tests::status_reports_a_detached_head ... ok
+test templates::tests::editing_details_does_not_change_snapshot_or_generated_project ... ok
+test terminal::tests::runs_a_shell_inside_the_workspace_and_tracks_its_session ... ok
+test templates::tests::library_starts_empty_and_snapshot_survives_source_removal_and_restart ... ok
+test git::tests::history_paginates_and_is_empty_on_an_unborn_branch ... ok
+test process::tests::streams_output_and_reports_the_exit_code ... ok
+test terminal::tests::shell_output_round_trips_turkish_characters ... ok
+test terminal::tests::canonical_workspace_is_used_on_start_and_restart ... ok
+test git::tests::cloning_creates_a_new_folder_and_leaves_an_existing_one_untouched ... ok
+test git::tests::branch_deletion_protects_current_default_and_unmerged_branches ... ok
+test git::tests::status_reports_conflicts ... ok
+test git::tests::pulling_is_refused_without_an_upstream_or_with_local_changes ... ok
+test git::tests::push_and_pull_move_commits_between_two_clones ... ok
+test github::issues::tests::a_write_that_cannot_connect_is_an_ordinary_network_failure ... ok
+test git::tests::divergence_is_reported_and_never_forced ... ok
+test github::issues::tests::a_write_that_is_never_answered_is_unconfirmed_rather_than_failed ... ok
+test github::tests::an_answer_that_never_arrives_is_reported_as_a_timeout ... ok
+
+test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.37s
+
+     Running unittests src\main.rs (src-tauri\target\debug\deps\tbce-e7fc433fdb5e9140.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests tbce_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[exit 0]

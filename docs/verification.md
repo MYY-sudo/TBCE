@@ -784,6 +784,162 @@ byte-identical between the two, so the bundle inspection above holds for both.
   `CREDENTIALS_UNSUPPORTED` elsewhere by design, and that path has not been compiled or run.
 - Installer upgrade and uninstall, signing, and release ownership.
 
+## Milestone 9 — GitHub issues, September 18, 2026
+
+GitHub issues are implemented and covered by automated tests against a mock GitHub API. **This is
+not desktop acceptance.** No installed-app scenario ran in this session, no real GitHub request was
+made — so nothing was created, closed or reopened on any real repository — Milestone 6 gate items
+P10, P11 and P12 remain open, and the new checks 75-82 are added to the
+[manual run-sheet](acceptance-runsheet-m6.md) unexecuted.
+
+### Scope decisions
+
+The user chose four before implementation; the fifth was stated in the approved plan. All five are
+recorded in the [delivery checklist](milestone-9.md).
+
+1. **Body** as plain text, never rendered. No dependency added, content security policy unchanged.
+2. **Create** with title, body, labels, assignees and a milestone — the broader of the two options
+   offered.
+3. **Close** through an in-panel prompt offering Completed, Not planned or Cancel.
+4. **Filters** by state, label, assignee and milestone — again the broader option.
+5. **Desktop acceptance** continues under the Milestone 4-8 waiver.
+
+### Desktop acceptance waiver
+
+Unchanged in substance from [Milestone 8](#desktop-acceptance-waiver-and-what-changed-about-it):
+desktop automation works and check 1 has a recorded pass, so the outstanding work is unexecuted
+checks — now 53 with this milestone's eight — rather than a missing tool. Checks 75-82 are the first
+that change a real repository on GitHub, which is why the checklist requires a disposable one and
+two purpose-made tokens.
+
+### Automated verification
+
+Every command below exited 0. Raw output:
+[automated checks](evidence/m9-github-issues/automated-checks.log).
+
+| Check                                       | Before | After | Result |
+| ------------------------------------------- | ------ | ----- | ------ |
+| `npm run format:check`                      | —      | —     | Pass   |
+| `npm run lint`                              | —      | —     | Pass   |
+| `npx tsc -b`                                | —      | —     | Pass   |
+| `npm test`                                  | 168    | 201   | Pass   |
+| `cargo fmt --check`                         | —      | —     | Pass   |
+| `cargo clippy --all-targets -- -D warnings` | —      | —     | Pass   |
+| `cargo test --locked`                       | 110    | 130   | Pass   |
+
+Twenty new Rust tests and thirty-three new frontend tests. The "before" counts are 168 and 110,
+not the 146 and 107 in the Milestone 8 table above, because the Milestone 8 review fixes added
+twenty-two frontend and three Rust tests after that table was written; they are recorded in
+[the review notes](evidence/m8-github/review-fixes.md). Environment: Git 2.54.0.windows.1, Node
+24.15.0, npm 11.12.1, Cargo 1.96.0, Windows.
+[Source manifest](evidence/m9-github-issues/source-manifest.txt) fingerprints the tested tracked and
+untracked sources, excluding `docs/` and `README.md`; 105 entries, up from 102 with
+`src-tauri/src/github/issues.rs`, `src-tauri/src/github/mock.rs` and `src/github/IssuesTab.tsx`.
+Manifest SHA-256: `FAC66DE7E7A2A97205C0BE14387F85E705FD6460E779D45BF9485B06A1EEE9A1`.
+
+No dependency was added, on either side.
+
+### What the new tests actually assert
+
+The mock GitHub API moved from the Milestone 8 test block into `github/mock.rs` so both test
+modules share it, and it now records each request's method and JSON body as well as its path and
+headers. That is what lets a test assert what TBCE **sent**, which matters more once requests
+change things.
+
+- A create sends exactly `{"title", "body", "labels", "assignees", "milestone"}` as JSON with
+  `POST`: the title trimmed, duplicate labels removed case-insensitively, and an empty body or
+  empty list omitted rather than sent.
+- A pull request is never closed, reopened or read as an issue. The mock answers every `GET` with
+  a pull request, and the test requires three refusals and three recorded requests, all `GET`. It
+  was proven to bite: removing the guard in `change_state` makes it fail.
+- A label named `bug&state=all #1 ü` is sent percent-encoded, and the path carries exactly one
+  `state=`. An assignee or milestone carrying `&`, a zero milestone, a label with a newline and an
+  over-long label are refused with zero requests recorded.
+- An invalid draft — empty or blank title, a title one character over 256, a body one over 65,536,
+  eleven assignees, a login with a space, a label with a tab, milestone zero — and issue number
+  zero for read, close and reopen, all send nothing. A title of exactly 256 two-byte characters is
+  accepted, so the limit counts characters rather than bytes.
+- What GitHub silently drops is reported: a `201` whose answer lacks the requested label, assignee
+  and milestone produces all three in `dropped`.
+- A create whose answer never arrives is `GITHUB_WRITE_UNCONFIRMED` and was sent exactly once. A
+  create against a port nothing listens on is an ordinary `GITHUB_NETWORK_FAILED`, because it
+  cannot have arrived.
+- `410` on a list is "issues turned off"; `410` on one issue keeps GitHub's own "deleted" message;
+  `404` names the issue number; `422` keeps GitHub's validation message; a read-only token's `403`
+  stays a refusal. A `401` during a create drops the token and the cache.
+- A page of thirty issues whose bodies are 65,536 two-byte characters each — larger than 1 MiB —
+  is read, and is not cached; a single issue over 1 MiB is still refused.
+- The pickers read five pages of labels and stop, reporting `truncated`, then read assignees and
+  open milestones; colours that are not six hexadecimal digits and empty descriptions arrive as
+  nothing.
+
+The frontend tests use the same mocked-adapter pattern. The notable ones:
+
+- One refresh reads the first page of open issues, and switching to the Issues tab reads nothing.
+  A repository reporting `has_issues: false` is not asked for issues at all.
+- A refused or failing issue read leaves repository, branches and commits intact, and appears only
+  in the Issues tab.
+- A filter GitHub refuses leaves the previous filter and list in place instead of showing controls
+  the list does not reflect.
+- A second change started while one runs is refused, and the answer to a change for a replaced
+  folder is discarded.
+- A failed create keeps the typed draft; a write refused with `403` names Issues: Read and write;
+  a create whose follow-up list read fails is still reported as created.
+- The close prompt offers exactly Cancel, Not planned and Completed, and Cancel sends nothing.
+- A body containing `<img src=x onerror="alert(1)"><b>…</b>` renders inside a `pre` as text: no
+  `img` or `b` element exists in the document afterwards.
+
+### Production bundle
+
+The development-only harness is still excluded, the GitHub host still appears nowhere in the
+bundle, and no source file uses `dangerouslySetInnerHTML`.
+[Bundle inspection](evidence/m9-github-issues/production-bundle-exclusion.txt). The content
+security policy was not touched.
+
+### Deliberate negative checks
+
+Two tests were proven to fail when the thing they protect is removed, then restored:
+
+- Removing `allow-github-close-issue` from `capabilities/main.json` makes the registration test
+  report `github_close_issue is missing from the main window capability`.
+- Removing the pull-request check before `PATCH` in `change_state` makes
+  `a_pull_request_is_never_closed_or_reopened_through_the_issue_endpoint` fail.
+
+Both files were restored and their hashes match the source manifest.
+
+### Packaging
+
+`npm run tauri build -- --target x86_64-pc-windows-msvc` exited 0. Installer:
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`,
+SHA-256 `F35C8210A283263F9021478BA3FCDC8C4A39723B5A4BE10876DA0659377D9EF3`. It was **not** installed or exercised in this session.
+
+An earlier package, SHA-256 `F8D0A2A0B937ABBB43DC88F2AE3DF7CAA5C621A9F618591BE1E31A5A13CC289F`, was
+built while a source comment was still being edited, and is superseded; see correction 2.
+
+### Corrections made during this work
+
+1. The approved plan mapped every `410` to "issues turned off". GitHub also answers `410` for a
+   single deleted issue, so that mapping would have told a user that issues were disabled in a
+   repository where they plainly work. `410` is now `GITHUB_GONE` with GitHub's own message, and
+   only the list translates it to `GITHUB_ISSUES_DISABLED`.
+2. The first installer was built while a comment in `src/stores/github.ts` was being corrected
+   from "four requests" to "five". The comment does not reach the bundle, but a package must match
+   its source manifest, so the installer was rebuilt from the final source and the first hash is
+   recorded above only to say it is superseded.
+
+### Not verified
+
+- Installed-app behaviour of anything in this milestone, and no Issues tab rendered in WebView2.
+- **Any real GitHub request, and in particular any real write.** GitHub's live behaviour when it
+  silently drops labels, assignees or a milestone, its secondary rate limits on creating content,
+  its exact `422` details and its `410` bodies are unexercised against the live service.
+- Acceptance checks 75-82, and the still-open 15-42, 57-66 and 67-74.
+- Real TLS, a fine-grained token's actual Issues permission boundaries, and a repository with more
+  than five hundred labels, assignees or milestones.
+- Layout at 1280 × 820 and at the minimum 800 × 540 window size.
+- Operating systems other than Windows, installer upgrade and uninstall, signing, and release
+  ownership.
+
 ## Build notes
 
 Vite reports a large lazy Monaco chunk, expected for the bundled editor and language support. Tauri warns that the requested `com.tbce.app` identifier ends in `.app`; it is retained as specified, with macOS packaging deferred. Initial sandbox path-access errors were resolved by running build tools with the required filesystem access.

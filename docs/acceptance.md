@@ -106,6 +106,27 @@ value against github.com in a browser rather than against TBCE's own display.
 73. Revoke the token on github.com while TBCE is open, then refresh the panel. Confirm the panel reports that the account must be connected again and offers to connect, and confirm with Windows Credential Manager that the stored credential was removed. Disconnect a working account and confirm the repository information disappears with it and that the credential is gone. Disconnect while a read is in flight and confirm the button is not blocked by it.
 74. Open a private repository your token cannot see and confirm the refusal is explained rather than shown as an empty repository. Exhaust or simulate an exhausted rate limit and confirm the panel reports when it resets. Disconnect the machine from the network and confirm a refresh reports that GitHub could not be reached and that editing, saving and local Git all keep working. Check keyboard navigation, busy-state controls and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming every panel action stays reachable.
 
+## GitHub issues — installed-app checks
+
+These exercise the Milestone 9 Issues tab. They **change a real repository on
+GitHub**, so use a disposable repository you own and delete it afterwards, never a
+repository other people watch: every create, close and reopen notifies watchers.
+Use two tokens you create for the run and revoke when you finish: one fine-grained
+token with Metadata: Read, Contents: Read and Issues: Read and write on the
+disposable repository, and one with Issues: Read only. Compare every value against
+github.com in a browser rather than against TBCE's own display. The disposable
+repository needs at least two labels, one open milestone, more than thirty open
+issues and at least one open pull request.
+
+75. Open the disposable repository and choose the Issues tab. Confirm switching to the tab makes no request — the rate limit line must not move — and that the open list matches github.com's issue list with pull requests left out, including the pull request you opened. Confirm each row's number, title, author, labels with their colours, assignees, milestone and comment count. Use Load more and confirm the next page is appended, that no issue appears twice, and that Load more disappears on the last page.
+76. Switch to Closed and back to Open. Open Filters and confirm the Label, Assignee and Milestone lists match the repository's labels, assignable users and open milestones. Filter by one label, by one assignee, by Nobody, by one milestone and by No milestone, and confirm each list against the same filter on github.com. Clear the filters and confirm the unfiltered list returns.
+77. Open an issue whose body contains Markdown, an HTML tag such as `<b>bold</b>`, an image link, Turkish characters, an emoji and several paragraphs. Confirm the body is shown exactly as written — the tag appears as text, nothing is rendered or loaded — and that line breaks are kept. Confirm state, author, dates, labels, assignees, milestone and comment count match github.com. Use Back to issues and confirm the list is unchanged.
+78. Choose New issue. Confirm Create issue stays disabled with an empty or blank title. Create an issue with a Turkish title and a multi-line body, two labels, one assignee and a milestone. Confirm on github.com that exactly one issue exists with those values and that TBCE shows it. Cancel a second draft and confirm nothing is created. Switch to another panel mid-draft, come back, and confirm the typing survived.
+79. Close an issue: confirm the prompt offers Completed, Not planned and Cancel; confirm Cancel changes nothing on github.com; close once as not planned and once as completed, and confirm github.com records each reason. Confirm a closed issue leaves the Open list without a refresh. Reopen one from the Closed list and confirm github.com shows it open again.
+80. Switch to the read-only token. Confirm the issue list still reads, then attempt a create, a close and a reopen, and confirm each is refused with an explanation naming Issues: Read and write, that nothing changed on github.com, and that a typed draft survives the refusal. Then create an issue with a label and an assignee from an account with no push access to a repository it can read, if one is available, and confirm TBCE reports that GitHub left them out.
+81. Turn issues off in the disposable repository's settings and refresh: confirm the tab explains that issues are turned off and makes no issue request. Turn them back on. With a token lacking Issues access entirely, confirm the tab explains that the token cannot read issues while the Overview, Branches and Commits stay correct.
+82. Disconnect the network after typing a new issue and choose Create issue; confirm TBCE reports a failure or an unconfirmed change within the deadline, never a success, and that the draft survives. Reconnect and use Refresh, then confirm on github.com whether the issue exists and that TBCE agrees. Check keyboard navigation through the state buttons, filters, rows, form and dialog, busy-state controls while a change is in flight, and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming every Issues action stays reachable.
+
 ## Milestone 6 prerequisite evidence
 
 Checks 15-42 and the earlier editor gaps listed in the

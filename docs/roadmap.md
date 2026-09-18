@@ -571,6 +571,21 @@ pull request.
 
 #### Milestone 9 — GitHub issues
 
+Execution tracking: [Milestone 9 checklist](milestone-9.md).
+
+**Delivered September 18, 2026** as an Issues tab in the GitHub panel over six more
+`github_*` commands, three of which are the only requests TBCE sends that change anything
+on GitHub. Four scope decisions were chosen by the user before implementation: bodies are
+shown as plain text rather than rendered; a new issue can carry labels, assignees and a
+milestone as well as a title and body; closing asks for a reason — completed or not
+planned — in the panel rather than natively, because reopening undoes it; and the list
+filters by label, assignee and milestone as well as by state. Pull requests, which GitHub's
+issue endpoints also return, are left out of every list and refused before any change.
+Under the same waiver as Milestones 4 to 8 this milestone is covered by automated tests
+but is **not desktop-accepted**: installed-app checks 75-82 wait in the
+[manual run-sheet](acceptance-runsheet-m6.md) and need a disposable repository, because
+they change one. See the [verification record](verification.md).
+
 Implement:
 
 - List issues
@@ -588,6 +603,11 @@ Actions:
 - Reopen issue
 
 Comments and advanced metadata can come later. Keep GitHub models separate from generic TBCE models.
+
+Every item above shipped. Comments did not: the issue view shows the count GitHub reports
+and nothing more. Editing an issue after it is created, locking and transferring are also
+absent. GitHub models live in `github/issues.rs` and `types/github.ts` and are not shared
+with the generic TBCE types.
 
 ### Phase 11 — Pull requests
 

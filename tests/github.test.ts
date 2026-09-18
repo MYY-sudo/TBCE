@@ -3,11 +3,21 @@ import { actions, useGitHub } from '../src/stores/github';
 import { useWorkspace } from '../src/stores/workspace';
 import { github } from '../src/services/github';
 import { fileSystem } from '../src/services/filesystem';
-import { accountLabel, rateLabel, scopeLabel } from '../src/types/github';
+import {
+  accountLabel,
+  droppedLabel,
+  issueStateLabel,
+  matchesFilter,
+  rateLabel,
+  scopeLabel,
+} from '../src/types/github';
 import type {
   GitHubAccount,
   GitHubBranch,
   GitHubCommit,
+  GitHubIssue,
+  GitHubIssueChoices,
+  GitHubIssueDetail,
   GitHubPage,
   GitHubRepository,
 } from '../src/types/github';
@@ -21,6 +31,12 @@ vi.mock('../src/services/github', () => ({
     branches: vi.fn(),
     commits: vi.fn(),
     activity: vi.fn(),
+    issues: vi.fn(),
+    issue: vi.fn(),
+    issueChoices: vi.fn(),
+    createIssue: vi.fn(),
+    closeIssue: vi.fn(),
+    reopenIssue: vi.fn(),
   },
 }));
 vi.mock('../src/services/filesystem', () => ({
@@ -53,6 +69,7 @@ const repository: GitHubRepository = {
   forks: 0,
   watchers: 3,
   openIssuesAndPullRequests: 7,
+  hasIssues: true,
   pushedAt: '2026-09-17T09:00:00Z',
   language: 'Rust',
   url: 'https://github.com/MYY-sudo/TBCE',
@@ -77,6 +94,49 @@ const commit: GitHubCommit = {
   login: 'oyku',
   date: '2026-09-17T09:00:00Z',
 };
+const issue: GitHubIssue = {
+  number: 7,
+  title: 'Kaydetme çöküyor',
+  state: 'open',
+  stateReason: null,
+  author: 'oyku',
+  labels: [{ name: 'bug', color: 'd73a4a' }],
+  assignees: ['octocat'],
+  milestone: { number: 2, title: 'V1' },
+  comments: 3,
+  createdAt: '2026-09-18T10:00:00Z',
+  updatedAt: null,
+  closedAt: null,
+};
+const other: GitHubIssue = {
+  ...issue,
+  number: 6,
+  title: 'Docs',
+  labels: [],
+  assignees: [],
+  milestone: null,
+};
+const detail = (
+  changes: Partial<GitHubIssueDetail> = {},
+): GitHubIssueDetail => ({
+  ...issue,
+  body: 'Adımlar:\n1. aç',
+  rate: null,
+  ...changes,
+});
+const choices: GitHubIssueChoices = {
+  labels: [{ name: 'bug', color: 'd73a4a', description: null }],
+  assignees: ['octocat', 'oyku'],
+  milestones: [{ number: 2, title: 'V1', dueOn: null }],
+  truncated: false,
+  rate: null,
+};
+const openFilter = {
+  state: 'open',
+  label: null,
+  assignee: null,
+  milestone: null,
+} as const;
 beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
@@ -97,6 +157,7 @@ async function connect() {
   vi.mocked(github.branches).mockResolvedValue(page([branch]));
   vi.mocked(github.commits).mockResolvedValue(page([commit]));
   vi.mocked(github.activity).mockResolvedValue(page([]));
+  vi.mocked(github.issues).mockResolvedValue(page([issue, other], true));
   useWorkspace.setState({ workspace });
   await vi.waitFor(() =>
     expect(useGitHub.getState().link.status).toBe('found'),
@@ -564,4 +625,399 @@ test('labels explain what GitHub reported', () => {
   expect(
     rateLabel({ limit: 5000, remaining: 4990, reset: 1789000000 }),
   ).toContain('4990 of 5000 requests left');
+});
+
+test('one refresh also reads the first page of open issues', async () => {
+  await connect();
+
+  const state = useGitHub.getState();
+  expect(github.issues).toHaveBeenCalledWith('1', openFilter, 1);
+  expect(state.issues.map((entry) => entry.number)).toEqual([7, 6]);
+  expect(state.issuesMore).toBe(true);
+  expect(state.issuesDenied).toBe(false);
+  expect(state.issuesError).toBeNull();
+});
+
+test('switching to the issues tab reads nothing', async () => {
+  await connect();
+  vi.mocked(github.issues).mockClear();
+
+  actions.setTab('issues');
+
+  expect(useGitHub.getState().tab).toBe('issues');
+  expect(github.issues).not.toHaveBeenCalled();
+  expect(github.issueChoices).not.toHaveBeenCalled();
+});
+
+test('a repository with issues turned off is never asked for them', async () => {
+  await connect();
+  vi.mocked(github.repository).mockResolvedValue({
+    ...repository,
+    hasIssues: false,
+  });
+  vi.mocked(github.issues).mockClear();
+
+  expect(await actions.refresh()).toBe(true);
+
+  expect(github.issues).not.toHaveBeenCalled();
+  expect(useGitHub.getState()).toMatchObject({
+    issuesDisabled: true,
+    issues: [],
+    error: null,
+  });
+});
+
+test.each([
+  ['GITHUB_FORBIDDEN', { issuesDenied: true, issuesError: null }],
+  ['GITHUB_ISSUES_DISABLED', { issuesDisabled: true, issuesError: null }],
+  [
+    'GITHUB_UNAVAILABLE',
+    { issuesDenied: false, issuesError: 'Failure: GITHUB_UNAVAILABLE' },
+  ],
+])(
+  'refused issues (%s) leave the rest of the refresh intact',
+  async (code, expected) => {
+    await connect();
+    vi.mocked(github.issues).mockRejectedValueOnce({
+      code,
+      message: `Failure: ${code}`,
+    });
+
+    expect(await actions.refresh()).toBe(true);
+
+    expect(useGitHub.getState()).toMatchObject({
+      ...expected,
+      issues: [],
+      repository,
+      commits: [commit],
+      error: null,
+    });
+  },
+);
+
+test('a new filter reads its first page and is kept once GitHub answers', async () => {
+  await connect();
+  vi.mocked(github.issues).mockResolvedValue(page([issue]));
+
+  expect(await actions.setIssueFilter({ label: 'bug', state: 'closed' })).toBe(
+    true,
+  );
+
+  const filter = { ...openFilter, state: 'closed', label: 'bug' };
+  expect(github.issues).toHaveBeenLastCalledWith('1', filter, 1);
+  expect(useGitHub.getState()).toMatchObject({
+    issueFilter: filter,
+    issues: [issue],
+    issuePage: 1,
+    issuesMore: false,
+  });
+});
+
+test('a filter GitHub refuses leaves the previous filter and list in place', async () => {
+  await connect();
+  vi.mocked(github.issues).mockRejectedValueOnce({
+    code: 'GITHUB_INVALID_ISSUE',
+    message: 'That milestone cannot be used.',
+  });
+
+  expect(await actions.setIssueFilter({ milestone: '0' })).toBe(false);
+
+  expect(useGitHub.getState()).toMatchObject({
+    issueFilter: openFilter,
+    issues: [issue, other],
+    error: 'That milestone cannot be used.',
+  });
+});
+
+test('another page of issues is appended without repeating one', async () => {
+  await connect();
+  const later = { ...other, number: 5, title: 'Later' };
+  vi.mocked(github.issues).mockResolvedValue({
+    items: [other, later],
+    page: 2,
+    hasMore: false,
+    rate: null,
+  });
+
+  expect(await actions.moreIssues()).toBe(true);
+
+  expect(useGitHub.getState().issues.map((entry) => entry.number)).toEqual([
+    7, 6, 5,
+  ]);
+  expect(github.issues).toHaveBeenLastCalledWith('1', openFilter, 2);
+  expect(useGitHub.getState().issuesMore).toBe(false);
+});
+
+test('labels, assignees and milestones are read once, until the next refresh', async () => {
+  await connect();
+  vi.mocked(github.issueChoices).mockResolvedValue(choices);
+
+  await actions.loadChoices();
+  await actions.loadChoices();
+  expect(github.issueChoices).toHaveBeenCalledTimes(1);
+  expect(useGitHub.getState().choices).toEqual(choices);
+
+  await actions.refresh();
+  expect(useGitHub.getState().choices).toBeNull();
+  await actions.loadChoices();
+  expect(github.issueChoices).toHaveBeenCalledTimes(2);
+});
+
+test('opening an issue reads it with its body', async () => {
+  await connect();
+  vi.mocked(github.issue).mockResolvedValue(detail());
+
+  expect(await actions.openIssue(7)).toBe(true);
+
+  expect(github.issue).toHaveBeenCalledWith('1', 7);
+  expect(useGitHub.getState().selectedIssue?.body).toBe('Adımlar:\n1. aç');
+});
+
+test('an open issue is read again on refresh', async () => {
+  await connect();
+  vi.mocked(github.issue).mockResolvedValue(detail());
+  await actions.openIssue(7);
+  vi.mocked(github.issue).mockResolvedValue(detail({ title: 'Renamed' }));
+
+  await actions.refresh();
+
+  expect(github.issue).toHaveBeenCalledTimes(2);
+  expect(useGitHub.getState().selectedIssue?.title).toBe('Renamed');
+});
+
+test('closing sends the chosen reason and moves the issue out of the open list', async () => {
+  await connect();
+  vi.mocked(github.issue).mockResolvedValue(detail());
+  await actions.openIssue(7);
+  vi.mocked(github.closeIssue).mockResolvedValue(
+    detail({ state: 'closed', stateReason: 'not_planned' }),
+  );
+
+  expect(await actions.closeIssue('notPlanned')).toBe(true);
+
+  expect(github.closeIssue).toHaveBeenCalledWith('1', 7, 'notPlanned');
+  const state = useGitHub.getState();
+  expect(state.issues.map((entry) => entry.number)).toEqual([6]);
+  expect(state.selectedIssue?.state).toBe('closed');
+  expect(state.notice).toBe('Issue #7 closed.');
+});
+
+test('reopening an issue in the closed list takes it out of that list', async () => {
+  await connect();
+  const closed = { ...issue, state: 'closed' as const };
+  vi.mocked(github.issues).mockResolvedValue(page([closed]));
+  await actions.setIssueFilter({ state: 'closed' });
+  vi.mocked(github.issue).mockResolvedValue(detail({ state: 'closed' }));
+  await actions.openIssue(7);
+  vi.mocked(github.reopenIssue).mockResolvedValue(
+    detail({ stateReason: 'reopened' }),
+  );
+
+  expect(await actions.reopenIssue()).toBe(true);
+
+  expect(github.reopenIssue).toHaveBeenCalledWith('1', 7);
+  expect(useGitHub.getState().issues).toEqual([]);
+  expect(useGitHub.getState().notice).toBe('Issue #7 reopened.');
+});
+
+test('a closed issue that still matches the filter is updated in place', async () => {
+  await connect();
+  vi.mocked(github.issues).mockResolvedValue(
+    page([{ ...issue, state: 'closed' }]),
+  );
+  await actions.setIssueFilter({ state: 'closed' });
+  vi.mocked(github.issue).mockResolvedValue(detail({ state: 'closed' }));
+  await actions.openIssue(7);
+  vi.mocked(github.closeIssue).mockResolvedValue(
+    detail({ state: 'closed', stateReason: 'not_planned' }),
+  );
+
+  await actions.closeIssue('notPlanned');
+
+  expect(useGitHub.getState().issues[0].stateReason).toBe('not_planned');
+});
+
+test('creating sends the draft, clears it and re-reads the list', async () => {
+  await connect();
+  actions.compose(true);
+  actions.editDraft({
+    title: 'Yeni hata',
+    body: 'Gövde',
+    labels: ['bug'],
+    assignees: ['oyku'],
+    milestone: 2,
+  });
+  const created = detail({ number: 8, title: 'Yeni hata' });
+  vi.mocked(github.createIssue).mockResolvedValue({
+    issue: created,
+    dropped: { labels: [], assignees: [], milestone: false },
+  });
+  vi.mocked(github.issues).mockClear();
+
+  expect(await actions.createIssue()).toBe(true);
+
+  expect(github.createIssue).toHaveBeenCalledWith('1', {
+    title: 'Yeni hata',
+    body: 'Gövde',
+    labels: ['bug'],
+    assignees: ['oyku'],
+    milestone: 2,
+  });
+  expect(github.issues).toHaveBeenCalledWith('1', openFilter, 1);
+  expect(useGitHub.getState()).toMatchObject({
+    selectedIssue: created,
+    composing: false,
+    draft: { title: '', body: '', labels: [], assignees: [], milestone: null },
+    notice: 'Issue #8 created.',
+  });
+});
+
+test('metadata GitHub silently left out is reported after a create', async () => {
+  await connect();
+  actions.editDraft({ title: 'Başlık', labels: ['bug'], milestone: 2 });
+  vi.mocked(github.createIssue).mockResolvedValue({
+    issue: detail({ number: 8 }),
+    dropped: { labels: ['bug'], assignees: [], milestone: true },
+  });
+
+  await actions.createIssue();
+
+  expect(useGitHub.getState().notice).toBe(
+    'GitHub created the issue without labels bug, the milestone. Only people with push access can set these.',
+  );
+});
+
+test('a failed create keeps everything that was typed', async () => {
+  await connect();
+  actions.compose(true);
+  actions.editDraft({ title: 'Başlık', body: 'Uzun bir açıklama' });
+  vi.mocked(github.createIssue).mockRejectedValue({
+    code: 'GITHUB_WRITE_UNCONFIRMED',
+    message: 'GitHub did not confirm the change.',
+  });
+
+  expect(await actions.createIssue()).toBe(false);
+
+  expect(useGitHub.getState()).toMatchObject({
+    composing: true,
+    draft: { title: 'Başlık', body: 'Uzun bir açıklama' },
+    error: 'GitHub did not confirm the change.',
+  });
+});
+
+test('a write refused for permission names the permission it needs', async () => {
+  await connect();
+  actions.editDraft({ title: 'Başlık' });
+  vi.mocked(github.createIssue).mockRejectedValue({
+    code: 'GITHUB_FORBIDDEN',
+    message: 'Resource not accessible by personal access token',
+  });
+
+  await actions.createIssue();
+
+  expect(useGitHub.getState().error).toContain('Issues: Read and write');
+  expect(useGitHub.getState().account.status).toBe('signedIn');
+});
+
+test('a created issue is not reported as failed when the list cannot be re-read', async () => {
+  await connect();
+  actions.editDraft({ title: 'Başlık' });
+  vi.mocked(github.createIssue).mockResolvedValue({
+    issue: detail({ number: 8 }),
+    dropped: { labels: [], assignees: [], milestone: false },
+  });
+  vi.mocked(github.issues).mockRejectedValue({
+    code: 'GITHUB_TIMED_OUT',
+    message: 'GitHub did not answer in time.',
+  });
+
+  expect(await actions.createIssue()).toBe(true);
+
+  expect(useGitHub.getState()).toMatchObject({
+    error: null,
+    notice: 'Issue #8 created.',
+    issuesError: 'GitHub did not answer in time.',
+    selectedIssue: { number: 8 },
+  });
+});
+
+test('the answer to a change for a replaced folder is discarded', async () => {
+  await connect();
+  vi.mocked(github.issue).mockResolvedValue(detail());
+  await actions.openIssue(7);
+  let release!: (value: GitHubIssueDetail) => void;
+  vi.mocked(github.closeIssue).mockImplementationOnce(
+    () => new Promise((resolve) => (release = resolve)),
+  );
+  const pending = actions.closeIssue('completed');
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  useWorkspace.setState({ workspace: { ...workspace, id: '2' } });
+  release(detail({ state: 'closed' }));
+
+  expect(await pending).toBe(false);
+  expect(useGitHub.getState().selectedIssue).toBeNull();
+  expect(useGitHub.getState().issues).toEqual([]);
+});
+
+test('a second change started while one runs is refused', async () => {
+  await connect();
+  vi.mocked(github.issue).mockResolvedValue(detail());
+  await actions.openIssue(7);
+  let release!: (value: GitHubIssueDetail) => void;
+  vi.mocked(github.closeIssue).mockImplementationOnce(
+    () => new Promise((resolve) => (release = resolve)),
+  );
+  const first = actions.closeIssue('completed');
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+
+  expect(await actions.closeIssue('completed')).toBe(false);
+  expect(await actions.createIssue()).toBe(false);
+
+  release(detail({ state: 'closed' }));
+  expect(await first).toBe(true);
+  expect(github.closeIssue).toHaveBeenCalledTimes(1);
+  expect(github.createIssue).not.toHaveBeenCalled();
+});
+
+test('opening another folder forgets the issues, the filter and the draft', async () => {
+  await connect();
+  await actions.setIssueFilter({ label: 'bug' });
+  actions.editDraft({ title: 'Başlık' });
+  vi.mocked(github.link).mockResolvedValue({ status: 'noRepository' });
+
+  useWorkspace.setState({ workspace: { id: '2', name: 'o', path: 'C:/o' } });
+  await vi.waitFor(() =>
+    expect(useGitHub.getState().link.status).toBe('noRepository'),
+  );
+
+  expect(useGitHub.getState()).toMatchObject({
+    issues: [],
+    issueFilter: openFilter,
+    draft: { title: '' },
+    choices: null,
+  });
+});
+
+test('issue labels explain state, filters and what GitHub left out', () => {
+  expect(issueStateLabel(issue)).toBe('Open');
+  expect(issueStateLabel({ ...issue, state: 'closed' })).toBe('Closed');
+  expect(
+    issueStateLabel({ ...issue, state: 'closed', stateReason: 'not_planned' }),
+  ).toBe('Closed as not planned');
+  expect(matchesFilter(issue, openFilter)).toBe(true);
+  expect(matchesFilter(issue, { ...openFilter, label: 'BUG' })).toBe(true);
+  expect(matchesFilter(issue, { ...openFilter, label: 'docs' })).toBe(false);
+  expect(matchesFilter(issue, { ...openFilter, assignee: 'none' })).toBe(false);
+  expect(matchesFilter(other, { ...openFilter, assignee: 'none' })).toBe(true);
+  expect(matchesFilter(issue, { ...openFilter, milestone: '2' })).toBe(true);
+  expect(matchesFilter(issue, { ...openFilter, milestone: 'none' })).toBe(
+    false,
+  );
+  expect(matchesFilter(issue, { ...openFilter, state: 'closed' })).toBe(false);
+  expect(
+    droppedLabel({ labels: [], assignees: [], milestone: false }),
+  ).toBeNull();
+  expect(
+    droppedLabel({ labels: [], assignees: ['oyku'], milestone: false }),
+  ).toContain('assignees oyku');
 });

@@ -37,6 +37,8 @@ export interface GitHubRepository {
   /// GitHub counts issues and pull requests together, so the name says so. Separate counts arrive
   /// with the issue and pull request milestones.
   openIssuesAndPullRequests: number | null;
+  /// Whether issues are turned on for the repository, or null when GitHub did not say.
+  hasIssues: boolean | null;
   pushedAt: string | null;
   language: string | null;
   url: string | null;
@@ -70,6 +72,121 @@ export interface GitHubPage<T> {
   hasMore: boolean;
   rate: GitHubRateLimit | null;
 }
+export type GitHubIssueState = 'open' | 'closed';
+/// Why an issue is closed. The backend accepts these two and nothing else.
+export type GitHubCloseReason = 'completed' | 'notPlanned';
+export interface GitHubLabel {
+  name: string;
+  /// Six hexadecimal digits, checked by the backend before it reaches a style, or null.
+  color: string | null;
+}
+export interface GitHubIssue {
+  number: number;
+  title: string;
+  state: GitHubIssueState;
+  /// `completed`, `not_planned` or `reopened`, as GitHub reports it.
+  stateReason: string | null;
+  author: string | null;
+  labels: GitHubLabel[];
+  assignees: string[];
+  milestone: { number: number; title: string } | null;
+  comments: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  closedAt: string | null;
+}
+/// One issue with its body. The body is shown as written, never interpreted as markup.
+export interface GitHubIssueDetail extends GitHubIssue {
+  body: string | null;
+  rate: GitHubRateLimit | null;
+}
+/// What the filters and the new-issue form can offer. GitHub models stay here, apart from the
+/// generic TBCE types.
+export interface GitHubIssueChoices {
+  labels: (GitHubLabel & { description: string | null })[];
+  assignees: string[];
+  milestones: { number: number; title: string; dueOn: string | null }[];
+  /// At least one list stopped at its page limit.
+  truncated: boolean;
+  rate: GitHubRateLimit | null;
+}
+export interface GitHubIssueFilter {
+  state: GitHubIssueState;
+  label: string | null;
+  /// A login, or `none` for issues nobody is assigned to.
+  assignee: string | null;
+  /// A milestone number, or `none` for issues without one.
+  milestone: string | null;
+}
+export interface GitHubIssueDraft {
+  title: string;
+  body: string;
+  labels: string[];
+  assignees: string[];
+  milestone: number | null;
+}
+/// What GitHub silently left out of a new issue, which it does for someone without push access.
+export interface GitHubIssueDropped {
+  labels: string[];
+  assignees: string[];
+  milestone: boolean;
+}
+export interface GitHubIssueCreated {
+  issue: GitHubIssueDetail;
+  dropped: GitHubIssueDropped;
+}
+/// Whether an issue belongs in a list filtered this way. Used after a change, so an issue that
+/// no longer matches leaves the list without another request.
+export const matchesFilter = (
+  issue: GitHubIssue,
+  filter: GitHubIssueFilter,
+): boolean => {
+  if (issue.state !== filter.state) return false;
+  if (
+    filter.label &&
+    !issue.labels.some(
+      (label) => label.name.toLowerCase() === filter.label!.toLowerCase(),
+    )
+  )
+    return false;
+  if (filter.assignee === 'none' && issue.assignees.length) return false;
+  if (
+    filter.assignee &&
+    filter.assignee !== 'none' &&
+    !issue.assignees.some(
+      (login) => login.toLowerCase() === filter.assignee!.toLowerCase(),
+    )
+  )
+    return false;
+  if (filter.milestone === 'none' && issue.milestone) return false;
+  if (
+    filter.milestone &&
+    filter.milestone !== 'none' &&
+    String(issue.milestone?.number) !== filter.milestone
+  )
+    return false;
+  return true;
+};
+/// How an issue's state reads, including the reason GitHub recorded for closing it.
+export const issueStateLabel = (issue: GitHubIssue): string =>
+  issue.state === 'open'
+    ? 'Open'
+    : issue.stateReason === 'not_planned'
+      ? 'Closed as not planned'
+      : 'Closed';
+/// What GitHub left out of a new issue, as a sentence, or null when it applied everything.
+export const droppedLabel = (dropped: GitHubIssueDropped): string | null => {
+  const parts = [
+    ...(dropped.labels.length ? [`labels ${dropped.labels.join(', ')}`] : []),
+    ...(dropped.assignees.length
+      ? [`assignees ${dropped.assignees.join(', ')}`]
+      : []),
+    ...(dropped.milestone ? ['the milestone'] : []),
+  ];
+  return parts.length
+    ? `GitHub created the issue without ${parts.join(', ')}. Only people with push access can set these.`
+    : null;
+};
 /// The account line the panel shows. A token GitHub accepted without reporting a name is normal.
 export const accountLabel = (account: GitHubAccount): string =>
   account.status === 'signedIn'

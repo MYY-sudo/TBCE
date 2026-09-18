@@ -1,7 +1,8 @@
-//! Read-only GitHub repository context.
+//! GitHub repository context, and the issue changes the user asks for.
 //!
-//! The webview never names a host, a path or a header: commands carry a workspace identifier and
-//! a page number, and this module builds every request. Repository identity is read from the
+//! The webview never names a host, a path or a header: commands carry a workspace identifier, a
+//! page number and checked values, and this module builds every request. Only issues are ever
+//! written, from `issues`, and only on an explicit action. Repository identity is read from the
 //! workspace's own Git remote rather than supplied by the interface, and the access token lives in
 //! the operating system credential vault, is read per operation, and is never returned.
 
@@ -11,6 +12,14 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
+
+mod issues;
+#[cfg(test)]
+mod mock;
+
+pub use issues::{
+    CloseReason, Issue, IssueChoices, IssueCreated, IssueDetail, IssueDraft, IssueFilter,
+};
 
 const API: &str = "https://api.github.com";
 const HOST: &str = "github.com";
@@ -23,6 +32,9 @@ const READ_LIMIT: Duration = Duration::from_secs(20);
 const WRITE_LIMIT: Duration = Duration::from_secs(10);
 /// Answers are metadata, not repository contents. The cap is the same one the diff service uses.
 const BODY_CAP: usize = 1024 * 1024;
+/// An issue page carries up to thirty bodies of up to 65,536 characters, each up to four bytes in
+/// UTF-8, so its cap is sized for that rather than for metadata. Nothing else reads this much.
+const ISSUE_PAGE_CAP: usize = 8 * 1024 * 1024;
 const PER_PAGE: u32 = 30;
 const PAGE_MAX: u32 = 1000;
 /// Conditional-request cache. Small and cleared wholesale, because it exists to spare the rate
@@ -191,6 +203,8 @@ pub struct Repository {
     /// GitHub counts issues and pull requests together in this field, so the name says so rather
     /// than implying a separate issue count that would be wrong.
     pub open_issues_and_pull_requests: Option<u64>,
+    /// Whether the repository has issues turned on. Absent when GitHub did not say.
+    pub has_issues: Option<bool>,
     pub pushed_at: Option<String>,
     pub language: Option<String>,
     pub url: Option<String>,
@@ -272,6 +286,8 @@ struct RepositoryBody {
     subscribers_count: Option<u64>,
     #[serde(default)]
     open_issues_count: Option<u64>,
+    #[serde(default)]
+    has_issues: Option<bool>,
     #[serde(default)]
     pushed_at: Option<String>,
     #[serde(default)]
@@ -446,6 +462,7 @@ impl GitHubService {
             forks: body.forks_count,
             watchers: body.subscribers_count,
             open_issues_and_pull_requests: body.open_issues_count,
+            has_issues: body.has_issues,
             pushed_at: body.pushed_at,
             language: body.language,
             url: body.html_url,
@@ -564,7 +581,7 @@ impl GitHubService {
 
     fn user(&mut self, token: &str) -> Result<Account> {
         // Scopes arrive in a header, so this one request is made without the conditional cache.
-        let answer = self.send("/user", token, None)?;
+        let answer = self.send(Method::Get, "/user", token, None, None, BODY_CAP)?;
         let scopes = answer.scopes.clone();
         let body: UserBody = parse(&answer.answer.body)?;
         Ok(Account::SignedIn {
@@ -587,25 +604,14 @@ impl GitHubService {
     /// Every read goes through here: one place holds the headers, the deadlines, the body cap, the
     /// conditional cache and the status classification.
     fn get(&mut self, path: &str) -> Result<Answer> {
+        self.get_capped(path, BODY_CAP)
+    }
+
+    fn get_capped(&mut self, path: &str, cap: usize) -> Result<Answer> {
         let token = self.token()?;
         let etag = self.cache.get(path).map(|cached| cached.etag.clone());
-        let sent = match self.send(path, &token, etag.as_deref()) {
-            Err(error) if error.code == "GITHUB_AUTH_FAILED" => {
-                self.cache.clear();
-                if let Err(clear_error) = self.store.clear() {
-                    return Err(ServiceError::new(
-                        "GITHUB_AUTH_FAILED",
-                        format!(
-                            "{} The rejected credential could not be removed: {}",
-                            error.message,
-                            scrub(&clear_error.message, &token)
-                        ),
-                    ));
-                }
-                return Err(error);
-            }
-            result => result?,
-        };
+        let sent = self.send(Method::Get, path, &token, etag.as_deref(), None, cap);
+        let sent = self.authorized(&token, sent)?;
         if sent.not_modified {
             let cached = self.cache.get(path).ok_or_else(invalid)?;
             return Ok(Answer {
@@ -620,7 +626,43 @@ impl GitHubService {
         Ok(sent.answer)
     }
 
+    /// Every write goes through here. A write is never cached, never conditional and never retried:
+    /// sending it twice could create two issues. The cache needs no invalidation afterwards,
+    /// because every cached read is revalidated with `If-None-Match` and cannot come back stale.
+    fn write(&mut self, method: Method, path: &str, body: &serde_json::Value) -> Result<Answer> {
+        let token = self.token()?;
+        let sent = self.send(method, path, &token, None, Some(body), BODY_CAP);
+        Ok(self.authorized(&token, sent)?.answer)
+    }
+
+    /// A token GitHub rejects is dropped along with everything read with it, whichever request
+    /// found out.
+    fn authorized(&mut self, token: &str, sent: Result<Sent>) -> Result<Sent> {
+        match sent {
+            Err(error) if error.code == "GITHUB_AUTH_FAILED" => {
+                self.cache.clear();
+                if let Err(clear_error) = self.store.clear() {
+                    return Err(ServiceError::new(
+                        "GITHUB_AUTH_FAILED",
+                        format!(
+                            "{} The rejected credential could not be removed: {}",
+                            error.message,
+                            scrub(&clear_error.message, token)
+                        ),
+                    ));
+                }
+                Err(error)
+            }
+            result => result,
+        }
+    }
+
     fn remember(&mut self, path: &str, etag: String, answer: &Answer) {
+        // Only metadata-sized answers are kept, so the cache stays bounded by CACHE_MAX × BODY_CAP
+        // even though an issue page may be larger.
+        if answer.body.len() > BODY_CAP {
+            return;
+        }
         if self.cache.len() >= CACHE_MAX {
             self.cache.clear();
         }
@@ -634,11 +676,20 @@ impl GitHubService {
         );
     }
 
-    fn send(&self, path: &str, token: &str, etag: Option<&str>) -> Result<Sent> {
+    fn send(
+        &self,
+        method: Method,
+        path: &str,
+        token: &str,
+        etag: Option<&str>,
+        body: Option<&serde_json::Value>,
+        cap: usize,
+    ) -> Result<Sent> {
+        let writing = method != Method::Get;
         let url = format!("{}{}", self.base, path);
         let mut request = self
             .agent
-            .get(&url)
+            .request(method.name(), &url)
             .set("Accept", ACCEPT)
             .set("X-GitHub-Api-Version", API_VERSION)
             .set("User-Agent", AGENT)
@@ -646,10 +697,18 @@ impl GitHubService {
         if let Some(etag) = etag {
             request = request.set("If-None-Match", etag);
         }
-        let response = match request.call() {
+        let result = match body {
+            Some(body) => request
+                .set("Content-Type", "application/json")
+                .send_string(&body.to_string()),
+            None => request.call(),
+        };
+        let response = match result {
             Ok(response) => response,
             Err(ureq::Error::Status(_, response)) => response,
-            Err(ureq::Error::Transport(transport)) => return Err(network(&transport, token)),
+            Err(ureq::Error::Transport(transport)) => {
+                return Err(network(&transport, token, writing))
+            }
         };
         // Headers must be read before the body, which consumes the response.
         let status = response.status();
@@ -680,8 +739,15 @@ impl GitHubService {
                     .collect()
             })
             .unwrap_or_default();
-        let body = read_body(response, token)?;
-        if status == 200 {
+        let body = read_body(response, token, cap).map_err(|error| {
+            // The status line said the change was accepted; only the answer went missing.
+            if writing && error.code == "GITHUB_NETWORK_FAILED" {
+                unconfirmed()
+            } else {
+                error
+            }
+        })?;
+        if status == 200 || status == 201 {
             return Ok(Sent {
                 answer: Answer {
                     body,
@@ -704,8 +770,47 @@ struct Sent {
     not_modified: bool,
 }
 
+/// The methods this module sends. A closed set, so no caller can name another one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Method {
+    Get,
+    Post,
+    Patch,
+}
+
+impl Method {
+    fn name(self) -> &'static str {
+        match self {
+            Method::Get => "GET",
+            Method::Post => "POST",
+            Method::Patch => "PATCH",
+        }
+    }
+}
+
 fn clamp(page: u32) -> u32 {
     page.clamp(1, PAGE_MAX)
+}
+
+/// Percent-encodes a query value. Everything outside the unreserved set is escaped, so a value
+/// taken from a label name can never close its parameter and open another.
+fn encode(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
+}
+
+fn unconfirmed() -> ServiceError {
+    ServiceError::new(
+        "GITHUB_WRITE_UNCONFIRMED",
+        "GitHub did not confirm the change, so it may or may not have been made. Use Refresh to check before trying again.",
+    )
 }
 
 fn invalid() -> ServiceError {
@@ -724,8 +829,17 @@ fn scrub(text: &str, token: &str) -> String {
     text.replace(token, "***")
 }
 
-fn network(transport: &ureq::Transport, token: &str) -> ServiceError {
+fn network(transport: &ureq::Transport, token: &str, writing: bool) -> ServiceError {
     let message = scrub(&transport.to_string(), token);
+    // A write that never reached GitHub is an ordinary failure. One that may have arrived is not:
+    // saying it failed would invite a second attempt and a duplicate issue.
+    let unsent = matches!(
+        transport.kind(),
+        ureq::ErrorKind::Dns | ureq::ErrorKind::ConnectionFailed | ureq::ErrorKind::InvalidUrl
+    );
+    if writing && !unsent {
+        return unconfirmed();
+    }
     let timed_out = message.to_lowercase().contains("timed out")
         || matches!(transport.kind(), ureq::ErrorKind::Io)
             && message.to_lowercase().contains("time");
@@ -741,12 +855,12 @@ fn network(transport: &ureq::Transport, token: &str) -> ServiceError {
     )
 }
 
-fn read_body(response: ureq::Response, token: &str) -> Result<Vec<u8>> {
+fn read_body(response: ureq::Response, token: &str, cap: usize) -> Result<Vec<u8>> {
     let mut body = Vec::new();
     response
         .into_reader()
         // Reading one byte past the cap is what distinguishes "exactly full" from "too large".
-        .take(BODY_CAP as u64 + 1)
+        .take(cap as u64 + 1)
         .read_to_end(&mut body)
         .map_err(|error| {
             ServiceError::new(
@@ -757,7 +871,7 @@ fn read_body(response: ureq::Response, token: &str) -> Result<Vec<u8>> {
                 ),
             )
         })?;
-    if body.len() > BODY_CAP {
+    if body.len() > cap {
         return Err(ServiceError::new(
             "GITHUB_RESPONSE_INVALID",
             "GitHub returned more data than TBCE will read.",
@@ -826,6 +940,18 @@ fn classify(
         404 => ServiceError::new(
             "GITHUB_NOT_FOUND",
             "GitHub has no repository there, or this token cannot see it.",
+        ),
+        // Issues turned off, or a deleted issue. The caller knows which one it asked about.
+        410 => ServiceError::new(
+            "GITHUB_GONE",
+            detail("GitHub reports that this is no longer available."),
+        ),
+        422 => ServiceError::new(
+            "GITHUB_VALIDATION_FAILED",
+            format!(
+                "GitHub did not accept this change. {}",
+                detail("Check the fields and try again.")
+            ),
         ),
         // Redirects are never followed, so a moved repository arrives here rather than silently
         // resending the token to wherever it points.
@@ -1001,164 +1127,9 @@ pub fn linked(root: &Path) -> Result<(String, String)> {
 
 #[cfg(test)]
 mod tests {
+    use super::mock::*;
     use super::*;
-    use std::io::{BufRead, BufReader, Write};
-    use std::net::TcpListener;
-    use std::sync::{Arc, Mutex};
-
-    /// One canned answer. The mock server hands these out in order, so a test states exactly what
-    /// GitHub is pretending to do.
-    #[derive(Clone)]
-    struct Stub {
-        status: u16,
-        headers: Vec<(String, String)>,
-        body: String,
-        delay: Option<Duration>,
-    }
-
-    impl Stub {
-        fn ok(body: &str) -> Self {
-            Self {
-                status: 200,
-                headers: Vec::new(),
-                body: body.to_string(),
-                delay: None,
-            }
-        }
-
-        fn code(status: u16, body: &str) -> Self {
-            Self {
-                status,
-                headers: Vec::new(),
-                body: body.to_string(),
-                delay: None,
-            }
-        }
-
-        fn header(mut self, name: &str, value: impl Into<String>) -> Self {
-            self.headers.push((name.to_string(), value.into()));
-            self
-        }
-
-        fn slow(mut self) -> Self {
-            self.delay = Some(READ_LIMIT + Duration::from_secs(5));
-            self
-        }
-    }
-
-    struct Recorded {
-        path: String,
-        headers: Vec<String>,
-    }
-
-    struct Server {
-        base: String,
-        seen: Arc<Mutex<Vec<Recorded>>>,
-    }
-
-    impl Server {
-        fn requests(&self) -> usize {
-            self.seen.lock().unwrap().len()
-        }
-
-        fn path(&self, index: usize) -> String {
-            self.seen.lock().unwrap()[index].path.clone()
-        }
-
-        fn sent(&self, index: usize, header: &str) -> Option<String> {
-            let needle = format!("{}:", header.to_lowercase());
-            self.seen.lock().unwrap()[index]
-                .headers
-                .iter()
-                .find(|line| line.to_lowercase().starts_with(&needle))
-                .map(|line| line[needle.len()..].trim().to_string())
-        }
-    }
-
-    /// A GitHub that is not GitHub: a local socket answering canned responses, so pagination, rate
-    /// limits, conditional requests and failures are exercised with no network and no token.
-    fn serve(stubs: Vec<Stub>) -> Server {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("a local port");
-        let base = format!("http://{}", listener.local_addr().unwrap());
-        let seen = Arc::new(Mutex::new(Vec::new()));
-        let log = Arc::clone(&seen);
-        std::thread::spawn(move || {
-            for (index, stream) in listener.incoming().enumerate() {
-                let Ok(mut stream) = stream else { break };
-                let mut reader = BufReader::new(stream.try_clone().expect("a cloned socket"));
-                let mut start = String::new();
-                if reader.read_line(&mut start).unwrap_or(0) == 0 {
-                    continue;
-                }
-                let path = start
-                    .split_whitespace()
-                    .nth(1)
-                    .unwrap_or_default()
-                    .to_string();
-                let mut headers = Vec::new();
-                loop {
-                    let mut line = String::new();
-                    if reader.read_line(&mut line).unwrap_or(0) == 0 || line.trim().is_empty() {
-                        break;
-                    }
-                    headers.push(line.trim().to_string());
-                }
-                log.lock().unwrap().push(Recorded { path, headers });
-                let Some(stub) = stubs.get(index).cloned() else {
-                    break;
-                };
-                if let Some(delay) = stub.delay {
-                    std::thread::sleep(delay);
-                }
-                let mut answer = format!(
-                    "HTTP/1.1 {} MOCK\r\nContent-Length: {}\r\nConnection: close\r\n",
-                    stub.status,
-                    stub.body.len()
-                );
-                for (name, value) in &stub.headers {
-                    answer.push_str(&format!("{name}: {value}\r\n"));
-                }
-                answer.push_str("\r\n");
-                let _ = stream.write_all(answer.as_bytes());
-                let _ = stream.write_all(stub.body.as_bytes());
-                let _ = stream.flush();
-            }
-        });
-        Server { base, seen }
-    }
-
-    #[derive(Default)]
-    struct Memory(Mutex<Option<String>>);
-
-    impl CredentialStore for Arc<Memory> {
-        fn read(&self) -> Result<Option<String>> {
-            Ok(self.0.lock().unwrap().clone())
-        }
-
-        fn write(&self, token: &str) -> Result<()> {
-            *self.0.lock().unwrap() = Some(token.to_string());
-            Ok(())
-        }
-
-        fn clear(&self) -> Result<()> {
-            *self.0.lock().unwrap() = None;
-            Ok(())
-        }
-    }
-
-    fn stored(store: &Arc<Memory>) -> Option<String> {
-        store.0.lock().unwrap().clone()
-    }
-
-    /// A service already holding a token, so the tests that read data do not restate signing in.
-    fn signed_in(server: &Server) -> (GitHubService, Arc<Memory>) {
-        let store = Arc::new(Memory::default());
-        store.write("ghp_token").unwrap();
-        (
-            GitHubService::with(&server.base, Box::new(Arc::clone(&store))),
-            store,
-        )
-    }
+    use std::sync::Arc;
 
     const USER: &str = r#"{"login":"octocat","name":"Öykü Çelik"}"#;
     const REPO: &str = r#"{"name":"TBCE","full_name":"MYY-sudo/TBCE","owner":{"login":"MYY-sudo"},
@@ -1550,16 +1521,17 @@ mod tests {
 
     #[test]
     fn nothing_in_this_module_prints() {
-        let source = include_str!("mod.rs");
-        let code = source
-            .split("#[cfg(test)]")
-            .next()
-            .expect("the non-test source");
-        for forbidden in ["println!", "eprintln!", "dbg!", "print!"] {
-            assert!(
-                !code.contains(forbidden),
-                "{forbidden} must never appear where a token could be formatted"
-            );
+        for source in [include_str!("mod.rs"), include_str!("issues.rs")] {
+            let code = source
+                .split("#[cfg(test)]")
+                .next()
+                .expect("the non-test source");
+            for forbidden in ["println!", "eprintln!", "dbg!", "print!"] {
+                assert!(
+                    !code.contains(forbidden),
+                    "{forbidden} must never appear where a token could be formatted"
+                );
+            }
         }
     }
 

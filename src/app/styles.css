@@ -1269,6 +1269,181 @@ kbd {
   color: #606875;
   padding: 2px 4px;
 }
+/* Issues. Rows are buttons so the list is reachable from the keyboard; bodies are plain text. */
+.github-issue-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.github-segment {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  background: #1f2329;
+  border-radius: 5px;
+  padding: 2px;
+}
+.github-segment button {
+  flex: 1;
+  font-size: 11px;
+  padding: 3px 6px;
+  color: #a7aeb8;
+  background: transparent;
+}
+.github-segment button.selected {
+  background: #2a2f37;
+  color: #f2f4f6;
+}
+.github-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px;
+  border-bottom: 1px solid #2b3037;
+}
+.github-filters select,
+.github-form select {
+  padding: 5px 8px;
+}
+.github-issue {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  justify-content: stretch;
+  gap: 2px 7px;
+  padding: 5px 4px;
+  font-size: 11px;
+  text-align: left;
+  background: transparent;
+  border-bottom: 1px solid #23272e;
+  border-radius: 0;
+  min-width: 0;
+}
+.github-issue svg {
+  color: #8f9d8a;
+  margin-top: 2px;
+}
+.github-issue > .github-meta,
+.github-issue > .github-tags {
+  grid-column: 2;
+}
+.github-issue .github-meta svg {
+  margin: 0;
+  vertical-align: -1px;
+}
+.github-issue-title {
+  color: #d4d8df;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.github-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 4px;
+}
+.github-issue > .github-tags {
+  padding: 0;
+}
+.github-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #c3cad3;
+  border: 1px solid #363b43;
+  border-radius: 9px;
+  padding: 0 6px;
+  overflow-wrap: anywhere;
+}
+.github-swatch {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.github-back {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 3px 6px;
+  background: transparent;
+  color: #a7aeb8;
+}
+.github-issue-heading {
+  margin: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.github-body {
+  margin: 0;
+  padding: 8px 9px;
+  background: #1f2329;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #c3cad3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.github-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 4px;
+}
+.github-actions button {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+.github-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.github-input {
+  width: 100%;
+  background: #181b20;
+  border: 1px solid #363b43;
+  border-radius: 5px;
+  padding: 6px 8px;
+  color: #e1e8df;
+}
+.github-form textarea {
+  min-height: 90px;
+}
+.github-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 4px 6px 6px;
+  max-height: 132px;
+  overflow-y: auto;
+  border: 1px solid #2b3037;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.github-choices legend {
+  font-size: 11px;
+  color: #8d96a3;
+  padding: 0 3px;
+}
+.github-choices label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.github-choices label > .github-tags {
+  padding: 0;
+}
+.github-choices input {
+  accent-color: #92c5a5;
+  flex-shrink: 0;
+}
 
 /* Development-only Git harness. Removed from production builds with its component. */
 .git-harness {

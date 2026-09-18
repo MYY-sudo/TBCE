@@ -1,6 +1,6 @@
 # Architecture
 
-TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, and read-only GitHub repository context. Issues, pull requests, the project dashboard and a database remain deferred.
+TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, and GitHub issues. Pull requests, the project dashboard and a database remain deferred.
 
 ## Boundaries
 
@@ -330,20 +330,21 @@ still asks for native confirmation in Rust rather than in the webview.
 GitHub panel
   → github store actions
   → typed GitHubService adapter
-  → eight github_* commands
+  → fourteen github_* commands
   → Rust GitHubService → bounded HTTP runner
   → api.github.com
 ```
 
 Milestone 8 reads a repository and never writes one. It answers a single question — what does
-GitHub know about the project that is open — and leaves issues, pull requests and the dashboard to
-the milestones that own them.
+GitHub know about the project that is open. Milestone 9 adds issues, and with them the only three
+requests TBCE sends that change anything on GitHub: creating, closing and reopening an issue, each
+on an explicit action. Pull requests and the dashboard stay with the milestones that own them.
 
 Three rules carry the security story, and they are the reason this shape was chosen over calling
 GitHub from the webview.
 
 - **The webview never names a host, a path, a header or a URL.** Commands carry a workspace
-  identifier and a page number; the backend builds every request. This is the same reasoning that
+  identifier, a page number and values the backend checks; the backend builds every request. This is the same reasoning that
   makes the terminal commands take a workspace identifier instead of a program.
 - **The token crosses IPC once, inbound.** `github_sign_in` is the only command that accepts one.
   Nothing returns it, it is read from the vault per operation rather than held in memory, and it is
@@ -387,7 +388,9 @@ Failures are classified into a fixed set of codes, because `ServiceError` carrie
 `GITHUB_SIGNED_OUT`, `GITHUB_AUTH_FAILED`, `GITHUB_FORBIDDEN`, `GITHUB_RATE_LIMITED`,
 `GITHUB_NOT_FOUND`, `GITHUB_UNAVAILABLE`, `GITHUB_NETWORK_FAILED`, `GITHUB_TIMED_OUT`,
 `GITHUB_RESPONSE_INVALID`, `GITHUB_NOT_LINKED`, `GITHUB_TOKEN_REJECTED`,
-`CREDENTIALS_UNAVAILABLE` and `CREDENTIALS_UNSUPPORTED`. GitHub's own `message` field is carried
+`CREDENTIALS_UNAVAILABLE` and `CREDENTIALS_UNSUPPORTED`, and since Milestone 9
+`GITHUB_WRITE_UNCONFIRMED`, `GITHUB_VALIDATION_FAILED` (a `422`), `GITHUB_GONE` (a `410`),
+`GITHUB_ISSUES_DISABLED`, `GITHUB_NOT_AN_ISSUE` and `GITHUB_INVALID_ISSUE`. GitHub's own `message` field is carried
 through where it explains something a user can act on — a SAML refusal, a suspended token — after
 being scrubbed.
 
@@ -449,6 +452,17 @@ saving one. The filesystem service remains a leaf.
 | `github_commits`    | `workspaceId`, `page`, `ref` | Page of commits                                     |
 | `github_activity`   | `workspaceId`, `page`        | Page of repository activity                         |
 
+Milestone 9 adds six more. The three that write are marked.
+
+| Command                | Arguments                         | Result                                                |
+| ---------------------- | --------------------------------- | ----------------------------------------------------- |
+| `github_issues`        | `workspaceId`, `filter`, `page`   | Page of issues, pull requests left out                |
+| `github_issue`         | `workspaceId`, `number`           | One issue with its body; a pull request is refused    |
+| `github_issue_choices` | `workspaceId`                     | Labels, assignees and open milestones for the pickers |
+| `github_create_issue`  | `workspaceId`, `draft`            | **Writes.** The new issue, and what GitHub left out   |
+| `github_close_issue`   | `workspaceId`, `number`, `reason` | **Writes.** The closed issue                          |
+| `github_reopen_issue`  | `workspaceId`, `number`           | **Writes.** The reopened issue                        |
+
 Counts are reported as GitHub reports them. `openIssuesAndPullRequests` is named after what the
 field actually contains: GitHub counts pull requests as issues, and a field called `openIssues`
 would be wrong in every repository with an open pull request.
@@ -459,9 +473,12 @@ One more activity-bar panel, mounted only while it is selected, so opening a fol
 the editor never reads GitHub. It reads when the panel appears, when the window regains focus while
 it is visible, and on its Refresh control. Nothing polls.
 
-One refresh reads everything the panel shows — repository, branches, commits and activity — so
-switching between Overview, Branches and Commits runs nothing at all. Four requests against a
-5000-per-hour allowance buys a panel that never waits when a tab is selected.
+One refresh reads everything the panel shows — repository, branches, commits, activity and the
+first page of issues — so switching between Overview, Branches, Commits and Issues runs nothing at
+all. Five requests against a 5000-per-hour allowance buys a panel that never waits when a tab is
+selected; a sixth re-reads an issue that is open on screen, so it cannot show a state older than the
+list beside it. Labels, assignees and milestones are read only when the filters or the new-issue
+form first need them.
 
 The store keeps two busy flags rather than one. Reading a repository must not disable the account
 controls: a stalled or rate-limited read is exactly when someone wants to disconnect, and blocking
@@ -471,10 +488,53 @@ signing in is global and opening another folder must not undo it.
 Activity is the one section allowed to fail alone. It needs more access than repository metadata, so
 a refusal leaves that section empty and explained instead of failing the whole read.
 
+### Issues
+
+Milestone 9 lives in `github/issues.rs`, a child of the GitHub module that uses the same runner, and
+its models stay GitHub's own rather than joining the generic TBCE types.
+
+**Writes.** `send` takes a method from a closed set — `GET`, `POST`, `PATCH` — and an optional JSON
+body, and accepts `201` beside `200`. A write goes through `write`, which is never conditional,
+never cached and never retried: sending a create twice would create two issues. A write that timed
+out after it may have reached GitHub is reported as `GITHUB_WRITE_UNCONFIRMED`, telling the user to
+refresh before trying again, rather than as a failure that invites a duplicate; a write that could
+not connect at all is an ordinary `GITHUB_NETWORK_FAILED`. The cache needs no invalidation after a
+write, because every cached read is revalidated with `If-None-Match` and cannot come back stale.
+
+**What the webview may send.** The filter, the draft and the close reason are checked before any
+request exists: a title is trimmed and must be 1-256 characters, a body at most 65,536, a label at
+most 50 characters with no control characters, at most 100 labels and 10 assignees, a login in
+GitHub's character set, a milestone or issue number of at least 1. The state and the close reason
+are Rust enums, so no other value deserializes. Query values are percent-encoded byte by byte, so a
+label called `bug&state=all` filters by that label rather than adding a parameter. A label colour
+reaches the interface only as six hexadecimal digits, because the panel puts it in a style.
+
+**Pull requests.** GitHub's issue endpoints return pull requests too, and `PATCH` on one closes a
+pull request as readily as an issue. Lists leave them out — so a page can be shorter than thirty
+while `Link` still advertises another — and closing or reopening reads the number first and refuses
+a pull request before anything is changed. The check costs one conditional request.
+
+**What GitHub silently drops.** Labels, assignees and a milestone are applied only for someone
+with push access, and GitHub drops them without an error otherwise. The answer to a create is
+compared with the request, case-insensitively as GitHub compares names, and whatever is missing is
+reported rather than assumed away.
+
+**Size.** An issue page can carry thirty bodies of 65,536 characters of up to four bytes each, so
+issue lists alone are read with an 8 MiB cap; everything else, a single issue included, keeps the
+1 MiB cap. Only answers within 1 MiB are cached, so the cache stays bounded at 64 × 1 MiB.
+
+**The panel.** Bodies are shown as plain text in a `pre` element, never rendered: Markdown would
+need a parser and a sanitizer, and images would stay blocked by the content security policy
+anyway. Closing asks for a reason — completed or not planned — in the panel's own dialog rather
+than a native one, because closing is undone by reopening; nothing here destroys data. The draft
+lives in the store, so a failed create or a switch to another panel loses no typing. A create is
+never reported as failed because the list could not be re-read afterwards: the issue exists, and the
+list says it could not refresh.
+
 ### What is deliberately absent
 
-No writes of any kind: no issue or pull request creation, no starring, no releases. No issue or pull
-request lists, which belong to Milestones 9 and 10. No GitLab or Bitbucket. No OAuth device flow, no
+No writes beyond creating, closing and reopening an issue: no editing, no comments, no locking, no
+pull request changes, no starring, no releases. No pull request lists, which belong to Milestone 10. No GitLab or Bitbucket. No OAuth device flow, no
 GitHub Enterprise host, no avatar images, no SQLite cache, no background polling, and no code
 browsing — the Code tab the roadmap suggests would duplicate the explorer for a working copy the
 user already has on disk.

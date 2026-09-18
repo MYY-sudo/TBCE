@@ -1,0 +1,54 @@
+Milestone 9 - GitHub issues: production bundle inspection
+Date: 2026-09-18
+Build: npm run tauri build -- --target x86_64-pc-windows-msvc
+Bundle: dist/ as produced by that build (Vite 7, production mode)
+
+Milestones 6 to 8 checked that the development-only Git harness does not ship
+and that the webview names no GitHub host. Both are rechecked, and one check is
+added: issue bodies are text from other people, so no component may set inner
+HTML, which would be the one way a body could become markup.
+
+$ grep -rl "tbce-git-harness-dev-only" dist/
+(no matches)
+
+$ grep -rl "api.github.com" dist/
+(no matches)
+
+The API host still appears nowhere in the bundle. The issue commands are
+named, never an endpoint, and the write methods live only in Rust:
+
+$ grep -o "github_[a-z_]*issue[a-z_]*" dist/assets/index-*.js | sort -u
+github_close_issue
+github_create_issue
+github_issue
+github_issue_choices
+github_issues
+github_reopen_issue
+
+$ grep -rlE "\"(POST|PATCH)\"" dist/assets/
+(no matches)
+
+$ grep -rln "dangerouslySetInnerHTML" src/
+(no matches)
+
+$ grep -c "dangerouslySetInnerHTML" dist/assets/index-*.js
+1
+
+React's own runtime names the property, which is why the bundle count is not
+zero; no TBCE source file uses it, which is the claim that matters.
+
+$ ls dist/assets | grep -iE "harness|github|issue"
+(no matches)
+
+The Issues tab ships inside the main entry chunk with the rest of the GitHub
+panel. The lazy chunks are unchanged: Editor, DiffView and TerminalPanel.
+
+$ grep -o "connect-src[^\"]*" src-tauri/tauri.conf.json
+connect-src ipc: http://ipc.localhost; worker-src 'self' blob:
+
+$ grep -o "img-src[^;]*" src-tauri/tauri.conf.json
+img-src 'self' data:
+
+The content security policy is unchanged by this milestone. The webview can
+make no request of its own and load no remote image, so an image link in an
+issue body could not load even if the body were rendered, which it is not.

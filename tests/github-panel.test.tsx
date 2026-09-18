@@ -10,6 +10,8 @@ import type {
   GitHubAccount,
   GitHubBranch,
   GitHubCommit,
+  GitHubIssue,
+  GitHubIssueDetail,
   GitHubLink,
   GitHubPage,
   GitHubRepository,
@@ -24,6 +26,12 @@ vi.mock('../src/services/github', () => ({
     branches: vi.fn(),
     commits: vi.fn(),
     activity: vi.fn(),
+    issues: vi.fn(),
+    issue: vi.fn(),
+    issueChoices: vi.fn(),
+    createIssue: vi.fn(),
+    closeIssue: vi.fn(),
+    reopenIssue: vi.fn(),
   },
 }));
 vi.mock('../src/services/filesystem', () => ({
@@ -63,6 +71,7 @@ const repository: GitHubRepository = {
   forks: 1,
   watchers: 3,
   openIssuesAndPullRequests: 7,
+  hasIssues: true,
   pushedAt: '2026-09-17T09:00:00Z',
   language: 'Rust',
   url: 'https://github.com/MYY-sudo/TBCE',
@@ -87,6 +96,28 @@ const commit: GitHubCommit = {
   login: 'oyku',
   date: '2026-09-17T09:00:00Z',
 };
+const issue: GitHubIssue = {
+  number: 7,
+  title: 'Kaydetme çöküyor',
+  state: 'open',
+  stateReason: null,
+  author: 'oyku',
+  labels: [{ name: 'bug', color: 'd73a4a' }],
+  assignees: ['octocat'],
+  milestone: { number: 2, title: 'V1' },
+  comments: 3,
+  createdAt: '2026-09-18T10:00:00Z',
+  updatedAt: null,
+  closedAt: null,
+};
+const detail = (
+  changes: Partial<GitHubIssueDetail> = {},
+): GitHubIssueDetail => ({
+  ...issue,
+  body: 'Adımlar:\n1. aç',
+  rate: null,
+  ...changes,
+});
 beforeEach(() => {
   vi.resetAllMocks();
   localStorage.clear();
@@ -99,6 +130,17 @@ beforeEach(() => {
   vi.mocked(github.branches).mockResolvedValue(page([branch]));
   vi.mocked(github.commits).mockResolvedValue(page([commit], true));
   vi.mocked(github.activity).mockResolvedValue(page([]));
+  vi.mocked(github.issues).mockResolvedValue(page([issue]));
+  vi.mocked(github.issueChoices).mockResolvedValue({
+    labels: [
+      { name: 'bug', color: 'd73a4a', description: 'Something is broken' },
+      { name: 'docs', color: null, description: null },
+    ],
+    assignees: ['octocat', 'oyku'],
+    milestones: [{ number: 2, title: 'V1', dueOn: null }],
+    truncated: false,
+    rate: null,
+  });
 });
 /// Renders the panel with an account and a linked repository already read.
 async function open(link: GitHubLink = found) {
@@ -361,3 +403,193 @@ test.each([
     expect(screen.getByText(repository.description!)).toBeInTheDocument();
   },
 );
+
+async function issuesTab() {
+  await open();
+  fireEvent.click(screen.getByRole('tab', { name: 'Issues' }));
+  await screen.findByText('OPEN ISSUES');
+}
+
+test('the issues tab shows what the refresh read without reading again', async () => {
+  await open();
+  vi.mocked(github.issues).mockClear();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Issues' }));
+
+  expect(await screen.findByText('Kaydetme çöküyor')).toBeInTheDocument();
+  expect(screen.getByText('bug')).toBeInTheDocument();
+  expect(screen.getByText(/#7 · oyku/)).toHaveTextContent(/V1 · octocat/);
+  expect(github.issues).not.toHaveBeenCalled();
+});
+
+test('an issue body is shown as text and never interpreted as markup', async () => {
+  vi.mocked(github.issue).mockResolvedValue(
+    detail({
+      body: '<img src=x onerror="alert(1)"><b>kalın</b>\n**markdown**',
+    }),
+  );
+  await issuesTab();
+
+  fireEvent.click(screen.getByRole('button', { name: /Kaydetme çöküyor/ }));
+
+  const body = await screen.findByText(/<img src=x/);
+  expect(body.tagName).toBe('PRE');
+  expect(body).toHaveTextContent('**markdown**');
+  expect(document.querySelector('.github-body img')).toBeNull();
+  expect(document.querySelector('.github-body b')).toBeNull();
+  expect(github.issue).toHaveBeenCalledWith('1', 7);
+});
+
+test('closing asks for a reason, and cancelling sends nothing', async () => {
+  vi.mocked(github.issue).mockResolvedValue(detail());
+  await issuesTab();
+  fireEvent.click(screen.getByRole('button', { name: /Kaydetme çöküyor/ }));
+  const close = await screen.findByRole('button', { name: 'Close issue' });
+
+  vi.mocked(ask).mockResolvedValueOnce(null);
+  fireEvent.click(close);
+  await vi.waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(ask).mock.calls[0][0].actions.map((a) => a.value)).toEqual([
+    'cancel',
+    'notPlanned',
+    'completed',
+  ]);
+  expect(github.closeIssue).not.toHaveBeenCalled();
+
+  vi.mocked(ask).mockResolvedValueOnce('notPlanned');
+  vi.mocked(github.closeIssue).mockResolvedValue(
+    detail({ state: 'closed', stateReason: 'not_planned' }),
+  );
+  fireEvent.click(close);
+
+  await vi.waitFor(() =>
+    expect(github.closeIssue).toHaveBeenCalledWith('1', 7, 'notPlanned'),
+  );
+  expect(
+    await screen.findByRole('button', { name: 'Reopen issue' }),
+  ).toBeInTheDocument();
+  expect(screen.getByText('Closed as not planned')).toBeInTheDocument();
+});
+
+test('the new issue form sends title, body, labels, assignees and milestone', async () => {
+  vi.mocked(github.createIssue).mockResolvedValue({
+    issue: detail({ number: 8, title: 'Yeni' }),
+    dropped: { labels: [], assignees: ['oyku'], milestone: false },
+  });
+  await issuesTab();
+
+  fireEvent.click(screen.getByRole('button', { name: 'New issue' }));
+  const create = await screen.findByRole('button', { name: 'Create issue' });
+  expect(create).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Title'), {
+    target: { value: 'Yeni' },
+  });
+  fireEvent.change(screen.getByLabelText('Description'), {
+    target: { value: 'Gövde' },
+  });
+  fireEvent.click(await screen.findByRole('checkbox', { name: /bug/ }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'oyku' }));
+  fireEvent.change(screen.getByLabelText('Milestone'), {
+    target: { value: '2' },
+  });
+  fireEvent.click(create);
+
+  await vi.waitFor(() =>
+    expect(github.createIssue).toHaveBeenCalledWith('1', {
+      title: 'Yeni',
+      body: 'Gövde',
+      labels: ['bug'],
+      assignees: ['oyku'],
+      milestone: 2,
+    }),
+  );
+  expect(
+    await screen.findByText(/created the issue without assignees oyku/),
+  ).toBeInTheDocument();
+  expect(github.issueChoices).toHaveBeenCalledTimes(1);
+});
+
+test('filters send the chosen value and can be cleared', async () => {
+  await issuesTab();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  await vi.waitFor(() => expect(github.issueChoices).toHaveBeenCalled());
+  const label = screen.getByLabelText('Label');
+  await vi.waitFor(() => expect(label).toBeEnabled());
+  fireEvent.change(label, { target: { value: 'bug' } });
+
+  await vi.waitFor(() =>
+    expect(github.issues).toHaveBeenLastCalledWith(
+      '1',
+      { state: 'open', label: 'bug', assignee: null, milestone: null },
+      1,
+    ),
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Clear filters' }));
+  await vi.waitFor(() =>
+    expect(github.issues).toHaveBeenLastCalledWith(
+      '1',
+      { state: 'open', label: null, assignee: null, milestone: null },
+      1,
+    ),
+  );
+});
+
+test('the closed issues are one press away', async () => {
+  await issuesTab();
+  vi.mocked(github.issues).mockResolvedValue(page([]));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Closed' }));
+
+  expect(await screen.findByText('No closed issues.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Closed' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+test('a repository with issues turned off says so and asks nothing', async () => {
+  vi.mocked(github.repository).mockResolvedValue({
+    ...repository,
+    hasIssues: false,
+  });
+  await open();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Issues' }));
+
+  expect(
+    await screen.findByText('Issues are turned off for this repository.'),
+  ).toBeInTheDocument();
+  expect(github.issues).not.toHaveBeenCalled();
+});
+
+test('a token that cannot read issues is explained in the tab alone', async () => {
+  vi.mocked(github.issues).mockRejectedValue({
+    code: 'GITHUB_FORBIDDEN',
+    message: 'no access',
+  });
+  await open();
+  expect(screen.queryByRole('alert')).toBeNull();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Issues' }));
+
+  expect(await screen.findByText(/cannot read issues/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'New issue' })).toBeDisabled();
+});
+
+test('a change in flight disables every issue action', async () => {
+  vi.mocked(github.issue).mockResolvedValue(detail());
+  await issuesTab();
+  fireEvent.click(screen.getByRole('button', { name: /Kaydetme çöküyor/ }));
+  await screen.findByRole('button', { name: 'Close issue' });
+
+  useGitHub.setState({ dataBusy: true });
+
+  await vi.waitFor(() =>
+    expect(screen.getByRole('button', { name: 'Close issue' })).toBeDisabled(),
+  );
+  expect(screen.getByRole('button', { name: 'Back to issues' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Disconnect account' }),
+  ).toBeEnabled();
+});

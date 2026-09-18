@@ -508,6 +508,75 @@ pub async fn github_activity(
     let (owner, repo) = linked(&app, workspace_id).await?;
     github_task(app, move |service| service.activity(&owner, &repo, page)).await
 }
+#[tauri::command]
+pub async fn github_issues(
+    app: AppHandle,
+    workspace_id: String,
+    filter: github::IssueFilter,
+    page: u32,
+) -> Result<github::Page<github::Issue>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.issues(&owner, &repo, &filter, page)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn github_issue(
+    app: AppHandle,
+    workspace_id: String,
+    number: u64,
+) -> Result<github::IssueDetail> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.issue(&owner, &repo, number)).await
+}
+#[tauri::command]
+pub async fn github_issue_choices(
+    app: AppHandle,
+    workspace_id: String,
+) -> Result<github::IssueChoices> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.issue_choices(&owner, &repo)).await
+}
+// The three commands below change GitHub. Like the reads, they name no repository: the target is
+// the open folder's own remote, resolved here, so the webview cannot aim a write elsewhere.
+#[tauri::command]
+pub async fn github_create_issue(
+    app: AppHandle,
+    workspace_id: String,
+    draft: github::IssueDraft,
+) -> Result<github::IssueCreated> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.create_issue(&owner, &repo, draft)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn github_close_issue(
+    app: AppHandle,
+    workspace_id: String,
+    number: u64,
+    reason: github::CloseReason,
+) -> Result<github::IssueDetail> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.close_issue(&owner, &repo, number, reason)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn github_reopen_issue(
+    app: AppHandle,
+    workspace_id: String,
+    number: u64,
+) -> Result<github::IssueDetail> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.reopen_issue(&owner, &repo, number)
+    })
+    .await
+}
 
 fn lock(state: &Backend) -> Result<std::sync::MutexGuard<'_, FileSystemService>> {
     state

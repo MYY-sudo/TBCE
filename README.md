@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 8: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, and read-only GitHub repository context. Desktop acceptance for the terminal, project system, stacks, architectures, Git, and GitHub remains pending; see the verification record.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 9: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, and GitHub issues. Desktop acceptance for the terminal, project system, stacks, architectures, Git, and GitHub remains pending; see the verification record.
 
 ## Available now
 
@@ -23,9 +23,10 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - Initialize and clone repositories, create and switch branches, stage and unstage, commit, and exchange commits with a remote.
 - Do all of it from a source-control panel: review changes, stage them, write a commit, switch branches, fetch, pull, push, read paged history, and preview any change as a patch.
 - Connect a GitHub account with a personal access token kept in the Windows Credential Manager, and read the repository behind the open project: owner, description, default branch, visibility, language, last push, stars, forks and watchers.
-- Read the remote branches GitHub reports, paged commits, and recent repository activity, all read-only.
+- Read the remote branches GitHub reports, paged commits, and recent repository activity.
+- List open and closed issues with their labels, assignees and milestone, filter them by label, assignee and milestone, read an issue's body, and create, close or reopen an issue.
 
-GitHub issues and pull requests, the project dashboard, running project commands, and the rest of V1 remain for later milestones.
+GitHub pull requests, the project dashboard, running project commands, and the rest of V1 remain for later milestones.
 
 ## Projects
 
@@ -101,12 +102,14 @@ locations must be HTTPS, SSH, `file://`, or a local path — transport helpers s
 
 ## GitHub
 
-Connecting an account is optional and read-only. TBCE never writes to GitHub: there is
-no issue creation, no starring and no releases in this release.
+Connecting an account is optional. The only thing TBCE changes on GitHub is an issue, and
+only when you create, close or reopen one; everything else in the panel is read-only. There
+is no issue editing, no commenting, no starring and no releases in this release.
 
 Create a personal access token at github.com/settings/tokens. A fine-grained token needs
-Metadata: Read and Contents: Read; a classic token needs `repo` for private repositories
-or `public_repo` for public ones. Paste it once into the panel's masked field.
+Metadata: Read, Contents: Read and Issues: Read, or Issues: Read and write if you want to
+create, close and reopen issues; a classic token needs `repo` for private repositories or
+`public_repo` for public ones. Paste it once into the panel's masked field.
 
 The token is stored in the Windows Credential Manager under `com.tbce.app`, written only
 after GitHub accepts it, and read again for each request. It is never written into your
@@ -124,8 +127,16 @@ which is why you see your login name rather than an avatar.
 
 The panel reads only while it is open: when it appears, when the window regains focus, and
 when you use Refresh. Nothing polls. GitHub counts pull requests as issues, so the single
-count on the Overview is labelled as open issues and pull requests together; separate lists
-arrive with the issue and pull request milestones.
+count on the Overview is labelled as open issues and pull requests together; the Issues tab
+lists issues alone, and pull requests arrive with their own milestone.
+
+Issue bodies are shown as plain text, exactly as written, rather than rendered. Closing an
+issue asks whether it was completed or is not planned, and can be undone by reopening it.
+GitHub applies labels, assignees and a milestone to a new issue only for people with push
+access and drops them silently otherwise; TBCE compares GitHub's answer with what you asked
+for and tells you what was left out. If a create or close is not confirmed before the
+deadline, TBCE says it may or may not have happened, so check with Refresh before trying
+again.
 
 ## Development
 
@@ -183,9 +194,10 @@ Rust confines editing and snapshot source reads to the selected workspace, saved
 - [Milestone 6 delivery checklist and prerequisite gate](docs/milestone-6.md)
 - [Milestone 7 delivery checklist](docs/milestone-7.md)
 - [Milestone 8 delivery checklist](docs/milestone-8.md)
+- [Milestone 9 delivery checklist](docs/milestone-9.md)
 - [Architecture and native interfaces](docs/architecture.md)
 - [Windows acceptance checklist](docs/acceptance.md)
-- [Manual acceptance run-sheet for checks 15-42, 57-66 and 67-74](docs/acceptance-runsheet-m6.md)
+- [Manual acceptance run-sheet for checks 15-42, 57-66, 67-74 and 75-82](docs/acceptance-runsheet-m6.md)
 - [Verification results](docs/verification.md)
 - [Remaining work](docs/remaining-work.md)
 
