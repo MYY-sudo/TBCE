@@ -5,7 +5,7 @@
 
 use super::{
     clamp, encode, parse, segment, GitHubService, Method, OwnerBody, Page, RateLimit,
-    ISSUE_PAGE_CAP, PER_PAGE,
+    LIST_PAGE_CAP, PER_PAGE,
 };
 use crate::filesystem::{Result, ServiceError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -205,7 +205,7 @@ struct IssueBody {
 }
 
 #[derive(Deserialize)]
-struct LabelBody {
+pub(super) struct LabelBody {
     name: String,
     #[serde(default)]
     color: Option<String>,
@@ -213,12 +213,30 @@ struct LabelBody {
     description: Option<String>,
 }
 
+impl LabelBody {
+    pub(super) fn label(self) -> Label {
+        Label {
+            name: self.name,
+            color: color(self.color),
+        }
+    }
+}
+
 #[derive(Deserialize)]
-struct MilestoneBody {
+pub(super) struct MilestoneBody {
     number: u64,
     title: String,
     #[serde(default)]
     due_on: Option<String>,
+}
+
+impl MilestoneBody {
+    pub(super) fn reference(self) -> MilestoneReference {
+        MilestoneReference {
+            number: self.number,
+            title: self.title,
+        }
+    }
 }
 
 impl IssueBody {
@@ -229,19 +247,9 @@ impl IssueBody {
             state: self.state,
             state_reason: self.state_reason,
             author: self.user.map(|user| user.login),
-            labels: self
-                .labels
-                .into_iter()
-                .map(|label| Label {
-                    name: label.name,
-                    color: color(label.color),
-                })
-                .collect(),
+            labels: self.labels.into_iter().map(LabelBody::label).collect(),
             assignees: self.assignees.into_iter().map(|user| user.login).collect(),
-            milestone: self.milestone.map(|milestone| MilestoneReference {
-                number: milestone.number,
-                title: milestone.title,
-            }),
+            milestone: self.milestone.map(MilestoneBody::reference),
             comments: self.comments,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -294,7 +302,7 @@ impl GitHubService {
         }
         path.push_str(&format!("&per_page={PER_PAGE}&page={page}"));
         let answer = self
-            .get_capped(&path, ISSUE_PAGE_CAP)
+            .get_capped(&path, LIST_PAGE_CAP)
             .map_err(|error| match error.code {
                 "GITHUB_GONE" => ServiceError::new(
                     "GITHUB_ISSUES_DISABLED",

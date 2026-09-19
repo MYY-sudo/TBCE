@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { github } from '../services/github';
 import { useWorkspace } from './workspace';
+import { actions as gitActions, useGit } from './git';
 import type {
   GitHubAccount,
   GitHubActivity,
@@ -14,12 +15,22 @@ import type {
   GitHubIssueFilter,
   GitHubLink,
   GitHubPage,
+  GitHubPullFile,
+  GitHubPullRequest,
+  GitHubPullRequestDetail,
+  GitHubPullState,
   GitHubRateLimit,
   GitHubRepository,
 } from '../types/github';
 import { droppedLabel, matchesFilter } from '../types/github';
 import type { ServiceError, Workspace } from '../types/workspace';
-export type GitHubTab = 'overview' | 'branches' | 'commits' | 'issues';
+export type GitHubTab =
+  'overview' | 'branches' | 'commits' | 'issues' | 'pulls';
+/// A changed file of a pull request whose patch is open in the editor area.
+export interface GitHubOpenPullFile {
+  number: number;
+  file: GitHubPullFile;
+}
 interface GitHubState {
   account: GitHubAccount;
   link: GitHubLink;
@@ -51,6 +62,19 @@ interface GitHubState {
   composing: boolean;
   /// Kept here rather than in the form, so a failed create or a panel switch loses no typing.
   draft: GitHubIssueDraft;
+  pulls: GitHubPullRequest[];
+  pullPage: number;
+  pullsMore: boolean;
+  /// A token without pull request access leaves this tab explained and the rest of the panel intact.
+  pullsDenied: boolean;
+  pullsError: string | null;
+  pullState: GitHubPullState;
+  selectedPull: GitHubPullRequestDetail | null;
+  pullFiles: GitHubPullFile[];
+  pullFilePage: number;
+  pullFilesMore: boolean;
+  pullFilesError: string | null;
+  pullFile: GitHubOpenPullFile | null;
   rate: GitHubRateLimit | null;
   tab: GitHubTab;
   /// Two flags, not one: loading commits must not disable Sign out, and signing out must not look
@@ -97,6 +121,18 @@ const empty = {
   selectedIssue: null as GitHubIssueDetail | null,
   composing: false,
   draft: blankDraft,
+  pulls: [] as GitHubPullRequest[],
+  pullPage: 1,
+  pullsMore: false,
+  pullsDenied: false,
+  pullsError: null as string | null,
+  pullState: 'open' as GitHubPullState,
+  selectedPull: null as GitHubPullRequestDetail | null,
+  pullFiles: [] as GitHubPullFile[],
+  pullFilePage: 1,
+  pullFilesMore: false,
+  pullFilesError: null as string | null,
+  pullFile: null as GitHubOpenPullFile | null,
   rate: null as GitHubRateLimit | null,
 };
 const initial: GitHubState = {
@@ -174,6 +210,56 @@ async function firstIssues(
     };
   }
 }
+/// The first page of pull requests in one state, with a refusal recorded as a state of the tab.
+async function firstPulls(
+  id: string,
+  state: GitHubPullState,
+): Promise<Partial<GitHubState>> {
+  try {
+    const page = await github.pullRequests(id, state, 1);
+    return {
+      pulls: page.items,
+      pullPage: 1,
+      pullsMore: page.hasMore,
+      pullsDenied: false,
+      pullsError: null,
+    };
+  } catch (failure) {
+    if (authenticationFailed(failure)) throw failure;
+    const denied = code(failure) === 'GITHUB_FORBIDDEN';
+    return {
+      pulls: [],
+      pullPage: 1,
+      pullsMore: false,
+      pullsDenied: denied,
+      pullsError: denied ? null : failed(failure),
+    };
+  }
+}
+/// The first page of a pull request's changed files. A failure is kept beside the list, because the
+/// pull request above it was read fine.
+async function firstFiles(
+  id: string,
+  number: number,
+): Promise<Partial<GitHubState>> {
+  try {
+    const page = await github.pullFiles(id, number, 1);
+    return {
+      pullFiles: page.items,
+      pullFilePage: 1,
+      pullFilesMore: page.hasMore,
+      pullFilesError: null,
+    };
+  } catch (failure) {
+    if (authenticationFailed(failure)) throw failure;
+    return {
+      pullFiles: [],
+      pullFilePage: 1,
+      pullFilesMore: false,
+      pullFilesError: failed(failure),
+    };
+  }
+}
 /// An issue changed on GitHub, reflected in the list without reading it again: replaced where it
 /// still matches the filter, removed where it no longer does.
 function changed(detail: GitHubIssueDetail): Partial<GitHubState> {
@@ -244,9 +330,9 @@ async function account(
     set({ accountBusy: false });
   }
 }
-/// One read of everything the panel shows, so switching tabs runs nothing at all. Five requests
-/// (six with an issue open) against a 5000-per-hour allowance buys a panel that never waits when a
-/// tab is selected.
+/// One read of everything the panel shows, so switching tabs runs nothing at all. Six requests
+/// (one more with an issue open, four more with a pull request open) against a 5000-per-hour
+/// allowance buys a panel that never waits when a tab is selected.
 async function reload(
   id: string,
   current: () => boolean,
@@ -291,6 +377,39 @@ async function reload(
     }
     if (!current()) return null;
   }
+  const pulls = await firstPulls(id, get().pullState);
+  if (!current()) return null;
+  // A pull request on screen is read again with its checks and first page of files, and an open
+  // patch stays open only while that page still lists its file.
+  let pullView: Partial<GitHubState> = {
+    selectedPull: null,
+    pullFiles: [],
+    pullFilePage: 1,
+    pullFilesMore: false,
+    pullFilesError: null,
+    pullFile: null,
+  };
+  const pull = get().selectedPull;
+  if (pull && !pulls.pullsDenied) {
+    try {
+      const detail = await github.pullRequest(id, pull.number);
+      if (!current()) return null;
+      const files = await firstFiles(id, pull.number);
+      const open = get().pullFile;
+      const still =
+        open?.number === pull.number
+          ? files.pullFiles?.find((file) => file.path === open.file.path)
+          : undefined;
+      pullView = {
+        ...files,
+        selectedPull: detail,
+        pullFile: still ? { number: pull.number, file: still } : null,
+      };
+    } catch (failure) {
+      if (authenticationFailed(failure)) throw failure;
+    }
+    if (!current()) return null;
+  }
   // Activity can be refused for a repository whose metadata is readable, which is a missing
   // section rather than a failed refresh.
   let activity: GitHubActivity[] = [];
@@ -323,6 +442,12 @@ async function reload(
     issuesError: issues.issuesError ?? null,
     choices: null,
     selectedIssue,
+    pulls: pulls.pulls ?? [],
+    pullPage: 1,
+    pullsMore: pulls.pullsMore ?? false,
+    pullsDenied: pulls.pullsDenied ?? false,
+    pullsError: pulls.pullsError ?? null,
+    ...pullView,
     error,
     rate: commits.rate ?? repository.rate ?? null,
   };
@@ -474,6 +599,86 @@ export const actions = {
         notice,
       };
     }),
+  /// Reads the first page in the other state. The state is only kept once GitHub has answered.
+  setPullState: (state: GitHubPullState) =>
+    perform(async (id) => {
+      const page = await github.pullRequests(id, state, 1);
+      return {
+        pullState: state,
+        pulls: page.items,
+        pullPage: 1,
+        pullsMore: page.hasMore,
+        pullsDenied: false,
+        pullsError: null,
+        rate: page.rate ?? get().rate,
+      };
+    }),
+  morePulls: () =>
+    perform(async (id) => {
+      const page = await github.pullRequests(
+        id,
+        get().pullState,
+        get().pullPage + 1,
+      );
+      const known = new Set(get().pulls.map((pull) => pull.number));
+      return {
+        // A pull request opened between two pages shifts the rest along, so one can arrive twice.
+        pulls: [
+          ...get().pulls,
+          ...page.items.filter((pull) => !known.has(pull.number)),
+        ],
+        pullPage: page.page,
+        pullsMore: page.hasMore,
+        rate: page.rate ?? get().rate,
+      };
+    }),
+  /// Reads the pull request with its checks, then its first page of changed files.
+  openPull: (number: number) =>
+    perform(async (id, current) => {
+      const detail = await github.pullRequest(id, number);
+      if (!current()) return null;
+      const files = await firstFiles(id, number);
+      return {
+        ...files,
+        selectedPull: detail,
+        pullFile: null,
+        rate: detail.rate ?? get().rate,
+      };
+    }),
+  moreFiles: () =>
+    perform(async (id) => {
+      const number = get().selectedPull?.number;
+      if (!number) return null;
+      const page = await github.pullFiles(id, number, get().pullFilePage + 1);
+      const known = new Set(get().pullFiles.map((file) => file.path));
+      return {
+        pullFiles: [
+          ...get().pullFiles,
+          ...page.items.filter((file) => !known.has(file.path)),
+        ],
+        pullFilePage: page.page,
+        pullFilesMore: page.hasMore,
+        rate: page.rate ?? get().rate,
+      };
+    }),
+  backToPulls: () =>
+    set({
+      selectedPull: null,
+      pullFiles: [],
+      pullFilePage: 1,
+      pullFilesMore: false,
+      pullFilesError: null,
+      pullFile: null,
+    }),
+  /// Shows a changed file's patch in the editor area. It needs no request, because GitHub sent the
+  /// patch with the file list. Only one patch is shown at a time, so a local diff is closed.
+  openPullFile: (file: GitHubPullFile) => {
+    const number = get().selectedPull?.number;
+    if (!number) return;
+    gitActions.closeDiff();
+    set({ pullFile: { number, file } });
+  },
+  closePullFile: () => set({ pullFile: null }),
   dismissError: () => set({ error: null }),
   dismissNotice: () => set({ notice: null }),
 };
@@ -484,4 +689,9 @@ useWorkspace.subscribe((state, previous) => {
   // The account survives a workspace change; everything about the repository does not.
   set({ ...initial, account: get().account, accountBusy: get().accountBusy });
   if (state.workspace) void actions.detect(state.workspace);
+});
+// A local diff and a pull request patch share the editor area, so opening a diff closes the patch.
+useGit.subscribe((state, previous) => {
+  if (state.selected && state.selected !== previous.selected && get().pullFile)
+    set({ pullFile: null });
 });

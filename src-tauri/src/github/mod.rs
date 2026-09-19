@@ -2,9 +2,11 @@
 //!
 //! The webview never names a host, a path or a header: commands carry a workspace identifier, a
 //! page number and checked values, and this module builds every request. Only issues are ever
-//! written, from `issues`, and only on an explicit action. Repository identity is read from the
-//! workspace's own Git remote rather than supplied by the interface, and the access token lives in
-//! the operating system credential vault, is read per operation, and is never returned.
+//! written, from `issues`, and only on an explicit action; pull requests, from `pulls`, and the
+//! dashboard's counts, milestones and head checks, from `overview`, are only ever read. Repository
+//! identity is read from the workspace's own Git remote rather than supplied
+//! by the interface, and the access token lives in the operating system credential vault, is read
+//! per operation, and is never returned.
 
 use crate::filesystem::{Result, ServiceError};
 use serde::{Deserialize, Serialize};
@@ -16,10 +18,14 @@ use std::time::Duration;
 mod issues;
 #[cfg(test)]
 mod mock;
+mod overview;
+mod pulls;
 
 pub use issues::{
     CloseReason, Issue, IssueChoices, IssueCreated, IssueDetail, IssueDraft, IssueFilter,
 };
+pub use overview::{Counts, HeadChecks, Milestone};
+pub use pulls::{PullFile, PullRequest, PullRequestDetail, PullState};
 
 const API: &str = "https://api.github.com";
 const HOST: &str = "github.com";
@@ -32,9 +38,10 @@ const READ_LIMIT: Duration = Duration::from_secs(20);
 const WRITE_LIMIT: Duration = Duration::from_secs(10);
 /// Answers are metadata, not repository contents. The cap is the same one the diff service uses.
 const BODY_CAP: usize = 1024 * 1024;
-/// An issue page carries up to thirty bodies of up to 65,536 characters, each up to four bytes in
-/// UTF-8, so its cap is sized for that rather than for metadata. Nothing else reads this much.
-const ISSUE_PAGE_CAP: usize = 8 * 1024 * 1024;
+/// An issue or pull request page carries up to thirty bodies of up to 65,536 characters, each up to
+/// four bytes in UTF-8, and a page of changed files carries thirty patches, so these lists are
+/// capped for that rather than for metadata. Nothing else reads this much.
+const LIST_PAGE_CAP: usize = 8 * 1024 * 1024;
 const PER_PAGE: u32 = 30;
 const PAGE_MAX: u32 = 1000;
 /// Conditional-request cache. Small and cleared wholesale, because it exists to spare the rate
@@ -357,12 +364,15 @@ struct Cached {
     etag: String,
     body: Vec<u8>,
     has_more: bool,
+    last: Option<u32>,
 }
 
 /// One answer from GitHub, after the status has been accepted.
 struct Answer {
     body: Vec<u8>,
     has_more: bool,
+    /// The last page GitHub's `Link` header names, which is how a count is read without paging.
+    last: Option<u32>,
     rate: Option<RateLimit>,
 }
 
@@ -617,6 +627,7 @@ impl GitHubService {
             return Ok(Answer {
                 body: cached.body.clone(),
                 has_more: cached.has_more,
+                last: cached.last,
                 rate: sent.answer.rate,
             });
         }
@@ -672,6 +683,7 @@ impl GitHubService {
                 etag,
                 body: answer.body.clone(),
                 has_more: answer.has_more,
+                last: answer.last,
             },
         );
     }
@@ -714,6 +726,7 @@ impl GitHubService {
         let status = response.status();
         let rate = rate_of(&response);
         let has_more = advertises_next(&response);
+        let last = last_page(&response);
         let etag = response.header("etag").map(str::to_string);
         let retry_after = response.header("retry-after").is_some();
         if status == 304 {
@@ -721,6 +734,7 @@ impl GitHubService {
                 answer: Answer {
                     body: Vec::new(),
                     has_more,
+                    last,
                     rate,
                 },
                 etag,
@@ -752,6 +766,7 @@ impl GitHubService {
                 answer: Answer {
                     body,
                     has_more,
+                    last,
                     rate,
                 },
                 etag,
@@ -898,6 +913,24 @@ fn advertises_next(response: &ureq::Response) -> bool {
         link.split(',')
             .any(|part| part.contains("rel=\"next\"") || part.contains("rel=next"))
     })
+}
+
+/// The page number of the `rel="last"` link, when GitHub sends one. Only the digits of its `page`
+/// parameter are read; nothing else in the link is trusted or followed.
+fn last_page(response: &ureq::Response) -> Option<u32> {
+    let link = response.header("link")?;
+    let part = link
+        .split(',')
+        .find(|part| part.contains("rel=\"last\"") || part.contains("rel=last"))?;
+    let target = part.split('>').next()?;
+    let query = target.split_once('?')?.1;
+    let value = query
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("page="))?;
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    value.parse().ok()
 }
 
 fn classify(

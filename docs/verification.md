@@ -940,6 +940,326 @@ built while a source comment was still being edited, and is superseded; see corr
 - Operating systems other than Windows, installer upgrade and uninstall, signing, and release
   ownership.
 
+## Milestone 10 — GitHub pull requests, September 18, 2026
+
+The pull request viewer is implemented and covered by automated tests against a mock GitHub API.
+**This is not desktop acceptance.** No installed-app scenario ran in this session and no real
+GitHub request was made. Milestone 6 gate items P10, P11 and P12 remain open, and the new checks
+83-90 are added to the [manual run-sheet](acceptance-runsheet-m6.md) unexecuted.
+
+### Scope decisions
+
+The user chose three before implementation; the fourth was stated in the approved plan. All four
+are recorded in the [delivery checklist](milestone-10.md).
+
+1. **Changed files** with their counts, and each file's patch opened read-only in the editor area.
+   This was the broader of the two options offered, and it adds no request, because GitHub sends
+   the patch with the file list.
+2. **CI/check state** from Checks API runs and commit statuses together. This was the broader
+   option again. It costs two requests, made only when a pull request is opened.
+3. **Filters** by open or closed only, with merged told apart from closed.
+4. **Desktop acceptance** continues under the Milestone 4-9 waiver.
+
+### Desktop acceptance waiver
+
+This is unchanged in substance from [Milestone 8](#desktop-acceptance-waiver-and-what-changed-about-it).
+Desktop automation works and check 1 has a recorded pass, so what is outstanding is unexecuted
+checks rather than a missing tool. With this milestone's eight there are now 61. Checks 83-90 only
+read, so unlike 75-82 they cannot change a repository. They do need one prepared with a fork, a
+draft, merged and closed pull requests, real CI reporting both check runs and a commit status, and a
+change of more than thirty files.
+
+### Automated verification
+
+Every command below exited 0. The raw output is in
+[automated checks](evidence/m10-github-pulls/automated-checks.log).
+
+| Check                                       | Before | After | Result |
+| ------------------------------------------- | ------ | ----- | ------ |
+| `npm run format:check`                      | —      | —     | Pass   |
+| `npm run lint`                              | —      | —     | Pass   |
+| `npx tsc -b`                                | —      | —     | Pass   |
+| `npm test`                                  | 201    | 229   | Pass   |
+| `cargo fmt --check`                         | —      | —     | Pass   |
+| `cargo clippy --all-targets -- -D warnings` | —      | —     | Pass   |
+| `cargo test --locked`                       | 130    | 146   | Pass   |
+
+- **New tests:** sixteen Rust and twenty-eight frontend.
+- **Environment:** Git 2.54.0.windows.1, Node 24.15.0, npm 11.12.1, Cargo 1.96.0, Windows.
+- **Source manifest:** the [source manifest](evidence/m10-github-pulls/source-manifest.txt)
+  fingerprints the tested tracked and untracked sources, excluding `docs/` and `README.md`. It has
+  110 entries, up from 105. The five new ones are:
+  - `src-tauri/src/github/pulls.rs`
+  - `src/components/PatchView.tsx`
+  - `src/github/PullFileView.tsx`
+  - `src/github/PullRequestsTab.tsx`
+  - `tests/patch-view.test.tsx`
+- **Manifest SHA-256:** `362148EFDCC814D44169FDD84B6039CB6BCAD9016D693D481E2BD7FB45173A3F`.
+
+No dependency was added on either side. The lucide icons used for the pull request states already
+ship in the installed `lucide-react` 0.468.0.
+
+### What the new tests actually assert
+
+The Rust tests use the mock GitHub API in `github/mock.rs`, which records each request's method,
+path, headers and body.
+
+- **Nothing writes.** A list, a pull request and a page of files send five requests between them,
+  and every one is a `GET` with no body.
+- **Checks target the right commit.** The check-run and status requests go to the head commit
+  GitHub reported. `../../user`, a three-character value, forty `g`s, and a valid SHA followed by
+  `?x=1` each produce one recorded request (the pull request itself) and a checks error, never a
+  second request.
+- **Summaries:**
+  - success plus skipped plus a successful status is passing;
+  - a run still in progress is pending;
+  - a pending status is pending;
+  - an errored status beside a queued run is failing;
+  - a `timed_out` run is failing;
+  - a commit whose only run was skipped is passing rather than none.
+- **Refusals and failures:**
+  - Refused check runs still leave the statuses read, and the reverse.
+  - A `500` on check runs and an unreadable status answer are both reported inside `checks.error`,
+    and the pull request is still returned.
+  - A `401` on check runs drops the token and the cache, and stops before the statuses are read.
+- **What the list reports:**
+  - A merged pull request and one closed without merging are told apart.
+  - A fork names its repository, and a deleted fork (`repo: null`) reads as cross-repository with
+    no repository.
+  - Requested teams follow requested users.
+- **Files:**
+  - A rename keeps its old path, a binary file has no patch, and paging follows `Link`.
+  - A page of thirty 20,000-character patches, larger than 1 MiB, is read and is not cached.
+- **Input limits:** `all`, `merged` and `open&x=1` do not deserialize as a state, and pull request
+  number zero sends nothing.
+
+The frontend tests use the same mocked-adapter pattern as earlier milestones. The notable ones:
+
+- **Reads:**
+  - One refresh reads the first page of open pull requests, and switching to the tab reads nothing.
+  - An open pull request is read again on refresh.
+- **Refusals stay local:**
+  - A pull request read refused with `403`, or failing some other way, leaves repository, branches,
+    commits and issues intact and appears only in the tab.
+  - Files that cannot be read are reported beside a pull request that is still shown.
+- **The closed state** is kept only once GitHub answers, and a failed switch leaves the open list in
+  place.
+- **Stale workspaces:** the answer for a pull request of a replaced folder is discarded, and its
+  files are never requested.
+- **Patches and the local diff:**
+  - An open patch survives a refresh while its file is still listed and closes when it is not.
+  - Opening a pull request file closes the local diff, and opening a local diff closes the patch.
+  - In the application shell, a patch hides the editor without unmounting it.
+- **Markup:** a description containing `<img src=x onerror="alert(1)"><b>…</b>` renders inside a
+  `pre` as text, and no `img` or `b` element exists afterwards.
+- **The patch view** with Monaco replaced by a recorder:
+  - The patch reaches the model unchanged, read-only.
+  - A file with no patch says so.
+  - The local diff keeps its own heading, binary banner and close control on the shared view.
+
+### Production bundle
+
+The development-only harness is still excluded, and the GitHub host and any write method still
+appear nowhere in the bundle. No source file uses `dangerouslySetInnerHTML` or `innerHTML`. The
+shared patch view is now a lazy chunk of its own, loaded only when a local diff or a pull request
+patch is opened. The content security policy was not touched. See the
+[bundle inspection](evidence/m10-github-pulls/production-bundle-exclusion.txt).
+
+### Deliberate negative checks
+
+Three tests were proven to fail when the thing they protect is removed. Each file was then restored:
+
+- Removing `allow-github-pull-files` from `capabilities/main.json` makes the registration test
+  report `github_pull_files is missing from the main window capability`.
+- Disabling the hexadecimal check on the head commit in `pulls.rs` makes
+  `a_head_commit_that_is_not_hexadecimal_is_never_put_in_a_path` fail with `../../user reached a
+request path`.
+- Removing the call that closes the local diff from `openPullFile` makes
+  `a pull request patch and a local diff never share the editor area` fail.
+
+All three files were restored from copies. Their SHA-256 hashes were checked against the copies
+taken beforehand, and they match the source manifest.
+
+### Packaging
+
+`npm run tauri build -- --target x86_64-pc-windows-msvc` exited 0. It produced the installer
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`, with
+SHA-256 `142C6BC780C158D0BB192A4FA17EF964E7009488C7AC15BB51BB7F8900571380`. The build ran on the
+final source, before the negative checks. The negative checks restored every file byte for byte,
+so the installer matches the source manifest. It was **not** installed or exercised in this
+session.
+
+### Not verified
+
+- **Installed-app behaviour** of anything in this milestone. No Pull requests tab or patch view has
+  been rendered in WebView2.
+- **Any real GitHub request.** None of the following has been exercised against the live service:
+  - GitHub's mergeable computation;
+  - real check-run and status payloads from GitHub Actions and external CI;
+  - patch omission for large files;
+  - fine-grained Pull requests, Checks and Commit statuses permission boundaries.
+- **Acceptance checks** 83-90, and the still-open 15-42, 57-66, 67-74 and 75-82.
+- **Scale:** a pull request with more than a hundred check runs, and a page of files over 8 MiB.
+- **Layout** at 1280 × 820 and at the minimum 800 × 540 window size, including how the five tabs
+  wrap.
+- **Platform and release:** operating systems other than Windows, installer upgrade and uninstall,
+  signing, and release ownership.
+
+## Milestone 11 — Project dashboard, September 19, 2026
+
+The project dashboard is implemented and covered by automated tests against a mock GitHub API and
+mocked services. **This is not desktop acceptance.** No installed-app scenario ran in this session
+and no real GitHub request was made. Milestone 6 gate items P10, P11 and P12 remain open, and the
+new checks 91-98 are added to the [manual run-sheet](acceptance-runsheet-m6.md) unexecuted.
+
+### Scope decisions
+
+The user chose four before implementation; the other two were stated in the approved plan. All six
+are recorded in the [delivery checklist](milestone-11.md).
+
+1. **Placement** in the editor area, replacing the Welcome screen once a folder is open.
+2. **Counts** exact, for one extra request, read from the `rel="last"` page of a one-per-page list.
+3. **Build** for the local HEAD commit, with a commit GitHub does not have read as not pushed.
+4. **Milestones** from GitHub, one new read; project progress a placeholder for Milestone 12.
+5. **Commands** displayed, not run, until Milestone 13.
+6. **Desktop acceptance** continues under the Milestone 4-10 waiver.
+
+### Desktop acceptance waiver
+
+This is unchanged in substance from [Milestone 8](#desktop-acceptance-waiver-and-what-changed-about-it).
+Desktop automation works and check 1 has a recorded pass, so what is outstanding is unexecuted
+checks rather than a missing tool. With this milestone's eight there are now 69. Checks 91-98 only
+read. They reuse the repository prepared for 83-90, with an open milestone added.
+
+### Automated verification
+
+Every command below exited 0. The raw output is in
+[automated checks](evidence/m11-dashboard/automated-checks.log).
+
+| Check                                       | Before | After | Result |
+| ------------------------------------------- | ------ | ----- | ------ |
+| `npm run format:check`                      | —      | —     | Pass   |
+| `npm run lint`                              | —      | —     | Pass   |
+| `npx tsc -b`                                | —      | —     | Pass   |
+| `npm test`                                  | 229    | 250   | Pass   |
+| `cargo fmt --check`                         | —      | —     | Pass   |
+| `cargo clippy --all-targets -- -D warnings` | —      | —     | Pass   |
+| `cargo test --locked`                       | 146    | 158   | Pass   |
+
+- **New tests:** twelve Rust and twenty-one frontend.
+- **Changed tests:** four application-shell tests about panels reading nothing while another panel
+  shows now open a file first. With a folder open and no file, the dashboard is on screen and reads
+  Git and the GitHub account by design, so without the file those tests would no longer be asking
+  what they were written to ask. The pull request fixtures gained the new `missing` field.
+- **Environment:** Git 2.54.0.windows.1, Node 24.15.0, npm 11.12.1, Cargo 1.96.0, Windows.
+- **Source manifest:** the [source manifest](evidence/m11-dashboard/source-manifest.txt)
+  fingerprints the tested tracked and untracked sources, excluding `docs/` and `README.md`. It has
+  116 entries, up from 110. The six new ones are:
+  - `src-tauri/src/github/overview.rs`
+  - `src/components/RecentProjects.tsx`
+  - `src/dashboard/Dashboard.tsx`
+  - `src/stores/dashboard.ts`
+  - `tests/dashboard-view.test.tsx`
+  - `tests/dashboard.test.ts`
+- **Manifest SHA-256:** `B756A6B92325B14B0B616F770CC488080E9535A2079A38DCAE19138C8B0D94CC`.
+
+No dependency was added on either side. The `LayoutDashboard` icon already ships in the installed
+`lucide-react` 0.468.0.
+
+### What the new tests actually assert
+
+The Rust tests use the mock GitHub API in `github/mock.rs`.
+
+- **Nothing writes.** Counts, milestones and head checks send five requests between them, and every
+  one is a `GET` with no body.
+- **Counts:**
+  - A `Link` header naming page 7 as last gives seven open pull requests, and twenty combined gives
+    thirteen issues.
+  - With no `Link`, an empty page is zero and a page of one is one.
+  - Two combined against five pull requests gives zero issues, not an underflow.
+  - Issues turned off give no issue count.
+  - On a second read the pull request count is revalidated with `If-None-Match`, answered `304`,
+    and still six.
+  - A last page of `9x` is ignored in favour of the page itself.
+  - A `401` on the pull request count drops the token.
+- **Milestones:** the query asks for open milestones soonest due first; counts, a Turkish title and
+  a missing due date survive; `Link` sets `hasMore`.
+- **Build:**
+  - A known commit is read with check runs and then statuses, at the paths for that commit.
+  - A `422` and a `404` on check runs each set `missing` after exactly one request.
+  - No commit and `../../user` each send nothing.
+
+The frontend tests use the mocked-adapter pattern of earlier milestones. The notable ones:
+
+- **Reads:**
+  - Signed out, the store asks GitHub nothing.
+  - One refresh reads counts, milestones and head checks.
+  - Refreshing everything also reads local Git and the GitHub store.
+- **Failures stay local:** a `403` on counts and a failure on milestones each stay in their section,
+  and head checks are still read after both. A `401` stops the rest and signs the GitHub store out.
+- **Stale folders:** counts answered after the folder changed are discarded, and head checks are
+  never requested.
+- **Sign-out** clears what was read with the account.
+- **The editor area:**
+  - Showing the dashboard closes a diff.
+  - Activating a tab, opening a diff or opening a pull request patch puts it in front.
+  - In the shell, the dashboard replaces the Welcome screen once a folder opens.
+  - It hides the editor without unmounting it, and a tab brings the editor back.
+  - Focus refreshes it only while visible.
+- **The dashboard:**
+  - Every card shows the values its store holds.
+  - A description containing `<img src=x onerror="alert(1)"><b>Tools</b>` renders as text, and no
+    `img` or `b` element exists.
+  - An unpushed commit reads as not on GitHub and raises no alert.
+  - A folder that is not a repository reads nothing from Git status or GitHub counts.
+  - The links call back with the right panel and tab.
+
+### Production bundle
+
+The development-only harness is still excluded, and the GitHub host and any write method still
+appear nowhere in the bundle. No source file uses `dangerouslySetInnerHTML` or `innerHTML`. The
+dashboard is a lazy chunk of its own. The content security policy was not touched. See the
+[bundle inspection](evidence/m11-dashboard/production-bundle-exclusion.txt).
+
+### Deliberate negative checks
+
+Three tests were proven to fail when the thing they protect is removed. Each file was then restored:
+
+- Removing `allow-github-head-checks` from `capabilities/main.json` makes the registration test
+  report `github_head_checks is missing from the main window capability`.
+- Removing the early return for a missing commit in `pulls.rs` makes
+  `a_commit_github_does_not_have_is_missing_after_one_request` fail with `422 still read the
+statuses`.
+- Removing the line that hides the dashboard when a tab is activated makes `the dashboard is shown
+in front of a diff or patch, and a file comes back in front of it` fail.
+
+All three files were restored from copies. Their SHA-256 hashes were checked against the copies
+taken beforehand, and they match the source manifest.
+
+### Packaging
+
+`npm run tauri build -- --target x86_64-pc-windows-msvc` exited 0. It produced the installer
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`, with
+SHA-256 `34185EC6B7DC4819FE9C2B5C77233FDDD3255B03D9A732087EBC88BA6C6B4CBB`. The build ran on the
+final source, after the negative checks had restored every file byte for byte, and the source
+manifest was checked against the tree again afterwards. It was **not** installed or exercised in
+this session.
+
+### Not verified
+
+- **Installed-app behaviour** of anything in this milestone. The dashboard has not been rendered in
+  WebView2.
+- **Any real GitHub request.** None of the following has been exercised against the live service:
+  - the `rel="last"` link on a real pulls list;
+  - how far GitHub's combined `open_issues_count` lags the pulls list;
+  - real milestone counts;
+  - GitHub's answer for a commit it does not have, which the tests take to be `422` or `404`.
+- **Acceptance checks** 91-98, and the still-open 15-42, 57-66, 67-74, 75-82 and 83-90.
+- **Layout** at 1280 × 820 and at the minimum 800 × 540 window size, including the single-column
+  collapse.
+- **Platform and release:** operating systems other than Windows, installer upgrade and uninstall,
+  signing, and release ownership.
+
 ## Build notes
 
 Vite reports a large lazy Monaco chunk, expected for the bundled editor and language support. Tauri warns that the requested `com.tbce.app` identifier ends in `.app`; it is retained as specified, with macOS packaging deferred. Initial sandbox path-access errors were resolved by running build tools with the required filesystem access.

@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 9: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, and GitHub issues. Desktop acceptance for the terminal, project system, stacks, architectures, Git, and GitHub remains pending; see the verification record.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 11: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, GitHub issues, a read-only pull request viewer, and a project dashboard. Desktop acceptance for the terminal, project system, stacks, architectures, Git, GitHub, and the dashboard remains pending; see the verification record.
 
 ## Available now
 
@@ -25,12 +25,14 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - Connect a GitHub account with a personal access token kept in the Windows Credential Manager, and read the repository behind the open project: owner, description, default branch, visibility, language, last push, stars, forks and watchers.
 - Read the remote branches GitHub reports, paged commits, and recent repository activity.
 - List open and closed issues with their labels, assignees and milestone, filter them by label, assignee and milestone, read an issue's body, and create, close or reopen an issue.
+- List open and closed pull requests, and read one: source and target branch, description, reviewers, counts, whether it merges cleanly, the state of its checks and commit statuses, and its changed files, each of which opens as a read-only patch in the editor area.
+- See the whole project on one dashboard: repository, Git state, branch, the CI state of the commit you have checked out, open issue and pull request counts, commands, GitHub milestones, recent commits and recent activity.
 
-GitHub pull requests, the project dashboard, running project commands, and the rest of V1 remain for later milestones.
+Creating, reviewing and merging pull requests, project progress, running project commands, and the rest of V1 remain for later milestones.
 
 ## Projects
 
-A TBCE project is a folder containing `.tbce/project.json`. The file records a schema version, name, stack, architecture, default branch, and commands. New projects store their selected stack and architecture's stable IDs; settings retain legacy values. Architecture changes in existing project settings only update metadata. Commands are stored for later milestones; TBCE does not run them yet. Project metadata makes no claim about Git. Detecting a project still runs no Git command, so opening a folder never waits on one; repository state comes from the Git service instead.
+A TBCE project is a folder containing `.tbce/project.json`. The file records a schema version, name, stack, architecture, default branch, and commands. New projects store their selected stack and architecture's stable IDs; settings retain legacy values. Architecture changes in existing project settings only update metadata. Commands are stored and shown on the dashboard; TBCE does not run them yet. Project metadata makes no claim about Git. Detecting a project still runs no Git command, so opening a folder never waits on one; repository state comes from the Git service instead.
 
 Opening a folder that has no manifest still works exactly as before. Use the project button in the explorer to convert it, or to edit an existing project's settings. Recent projects are remembered locally; an entry that no longer opens is reported and removed.
 
@@ -73,7 +75,7 @@ and closing the patch returns to them.
 
 Nothing polls. The panel reads the repository when you open it, when you save or open
 a file, when the window regains focus, after anything you do in it, and when you press
-Refresh. Close the panel and TBCE stops running Git entirely. A change made outside TBCE
+Refresh. The dashboard reads the same way while it is on screen. With the panel closed and a file in front of the dashboard, TBCE runs no Git at all. A change made outside TBCE
 appears on the next focus or refresh, not the instant it happens.
 
 Available operations are initialize, clone, status, branches, create branch, switch
@@ -104,12 +106,14 @@ locations must be HTTPS, SSH, `file://`, or a local path — transport helpers s
 
 Connecting an account is optional. The only thing TBCE changes on GitHub is an issue, and
 only when you create, close or reopen one; everything else in the panel is read-only. There
-is no issue editing, no commenting, no starring and no releases in this release.
+is no issue editing, no commenting, no starring and no releases in this release, and pull
+requests are only read: TBCE cannot create, review or merge one.
 
 Create a personal access token at github.com/settings/tokens. A fine-grained token needs
-Metadata: Read, Contents: Read and Issues: Read, or Issues: Read and write if you want to
-create, close and reopen issues; a classic token needs `repo` for private repositories or
-`public_repo` for public ones. Paste it once into the panel's masked field.
+Metadata, Contents, Issues, Pull requests, Checks and Commit statuses, all Read, or Issues:
+Read and write if you want to create, close and reopen issues; a classic token needs `repo`
+for private repositories or `public_repo` for public ones. A token missing one of these
+leaves that part of the panel explained and the rest working. Paste it once into the panel's masked field.
 
 The token is stored in the Windows Credential Manager under `com.tbce.app`, written only
 after GitHub accepts it, and read again for each request. It is never written into your
@@ -127,8 +131,8 @@ which is why you see your login name rather than an avatar.
 
 The panel reads only while it is open: when it appears, when the window regains focus, and
 when you use Refresh. Nothing polls. GitHub counts pull requests as issues, so the single
-count on the Overview is labelled as open issues and pull requests together; the Issues tab
-lists issues alone, and pull requests arrive with their own milestone.
+count on the Overview is labelled as open issues and pull requests together; the Issues and
+Pull requests tabs list each on its own.
 
 Issue bodies are shown as plain text, exactly as written, rather than rendered. Closing an
 issue asks whether it was completed or is not planned, and can be undone by reopening it.
@@ -137,6 +141,31 @@ access and drops them silently otherwise; TBCE compares GitHub's answer with wha
 for and tells you what was left out. If a create or close is not confirmed before the
 deadline, TBCE says it may or may not have happened, so check with Refresh before trying
 again.
+
+Pull request descriptions are plain text too. The Closed list tells merged pull requests
+apart from ones closed without merging, and a pull request from a fork names the fork. Checks
+combine GitHub Actions and other Checks API runs with commit statuses, which CI outside
+GitHub still uses, into one passing, failing or pending summary; they are read only when you
+open a pull request. Choosing a changed file shows GitHub's patch for it in the editor area,
+read-only like a local diff, and only one of the two is shown at a time.
+
+## Dashboard
+
+Open a folder and the dashboard appears where the Welcome screen was. With files open, the
+**Dashboard** button at the top of the activity bar brings it back in front of them; choosing a tab
+returns to the editor, which keeps your unsaved edits and undo history.
+
+Local cards work without an account: the project's name, stack, architecture and commands; how many
+files are staged, changed or untracked; the branch, its upstream and how far ahead or behind it is;
+and the latest commits. With a GitHub account connected and a github.com remote, the rest fill in:
+exact open issue and pull request counts, the checks on the commit you have checked out, open
+milestones with how much of each is closed, and recent activity. A commit you have not pushed says
+so rather than reading as a failure. The links on the Git state, Issues and Pull requests cards open
+the matching panel beside the dashboard.
+
+Like the panels, it reads only while it is on screen: when it appears, when the window regains focus
+and when you press Refresh. Commands are shown and not run yet, and project progress arrives in a
+later milestone; both cards say so.
 
 ## Development
 
@@ -195,9 +224,11 @@ Rust confines editing and snapshot source reads to the selected workspace, saved
 - [Milestone 7 delivery checklist](docs/milestone-7.md)
 - [Milestone 8 delivery checklist](docs/milestone-8.md)
 - [Milestone 9 delivery checklist](docs/milestone-9.md)
+- [Milestone 10 delivery checklist](docs/milestone-10.md)
+- [Milestone 11 delivery checklist](docs/milestone-11.md)
 - [Architecture and native interfaces](docs/architecture.md)
 - [Windows acceptance checklist](docs/acceptance.md)
-- [Manual acceptance run-sheet for checks 15-42, 57-66, 67-74 and 75-82](docs/acceptance-runsheet-m6.md)
+- [Manual acceptance run-sheet for checks 15-42, 57-66 and 67-98](docs/acceptance-runsheet-m6.md)
 - [Verification results](docs/verification.md)
 - [Remaining work](docs/remaining-work.md)
 

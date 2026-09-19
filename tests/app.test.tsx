@@ -48,6 +48,12 @@ vi.mock('../src/services/github', () => ({
     createIssue: vi.fn(),
     closeIssue: vi.fn(),
     reopenIssue: vi.fn(),
+    pullRequests: vi.fn(),
+    pullRequest: vi.fn(),
+    pullFiles: vi.fn(),
+    counts: vi.fn(),
+    milestones: vi.fn(),
+    headChecks: vi.fn(),
   },
 }));
 const repository = {
@@ -68,6 +74,21 @@ const status = {
   unstaged: [],
   untracked: [],
   conflicts: [],
+};
+/// An open file keeps the dashboard behind the editor, so a test about the panels sees only them.
+const openFile = {
+  tabs: [
+    {
+      id: 'tab-1',
+      path: 'src/app.ts',
+      content: 'a',
+      savedContent: 'a',
+      revision: 'sha-1',
+      bom: false,
+      external: null,
+    },
+  ],
+  activeId: 'tab-1',
 };
 beforeEach(() => {
   vi.resetAllMocks();
@@ -177,6 +198,7 @@ test('the GitHub panel is not read while another panel is showing', async () => 
   render(<App />);
   useWorkspace.setState({
     workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+    ...openFile,
   });
 
   await waitFor(() => expect(git.detect).toHaveBeenCalled());
@@ -191,6 +213,7 @@ test('the source control panel is not read while another panel is showing', asyn
   render(<App />);
   useWorkspace.setState({
     workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+    ...openFile,
   });
   await waitFor(() => expect(git.detect).toHaveBeenCalled());
   fireEvent.focus(window);
@@ -224,6 +247,49 @@ test('opening a diff hides the editor instead of unmounting it', async () => {
     expect(screen.getByText('Editor surface')).not.toBeVisible(),
   );
   expect(screen.getByText('Editor surface')).toBeInTheDocument();
+  useGit.setState({ selected: null });
+  await waitFor(() => expect(screen.getByText('Editor surface')).toBeVisible());
+});
+
+test('a pull request patch hides the editor, and a local diff takes its place', async () => {
+  useWorkspace.setState({
+    workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+    tabs: [
+      {
+        id: 'tab-1',
+        path: 'src/app.ts',
+        content: 'a',
+        savedContent: 'a',
+        revision: 'sha-1',
+        bom: false,
+        external: null,
+      },
+    ],
+    activeId: 'tab-1',
+  });
+  render(<App />);
+  expect(await screen.findByText('Editor surface')).toBeVisible();
+  useGitHub.setState({
+    pullFile: {
+      number: 12,
+      file: {
+        path: 'src/auth.ts',
+        previousPath: null,
+        status: 'modified',
+        additions: 1,
+        deletions: 0,
+        patch: '@@ -1 +1 @@',
+      },
+    },
+  });
+
+  await waitFor(() =>
+    expect(screen.getByText('Editor surface')).not.toBeVisible(),
+  );
+  expect(screen.getByText('Editor surface')).toBeInTheDocument();
+  // Opening a local diff closes the pull request patch rather than stacking a second view.
+  useGit.setState({ selected: { path: 'src/app.ts', staged: false } });
+  expect(useGitHub.getState().pullFile).toBeNull();
   useGit.setState({ selected: null });
   await waitFor(() => expect(screen.getByText('Editor surface')).toBeVisible());
 });
@@ -283,6 +349,7 @@ test.each(['GitHub', 'Toggle explorer'])(
     });
     useWorkspace.setState({
       workspace: { id: 'review-workspace', name: 'test', path: 'C:/test' },
+      ...openFile,
     });
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'GitHub' }));
@@ -297,3 +364,91 @@ test.each(['GitHub', 'Toggle explorer'])(
     expect(github.repository).not.toHaveBeenCalled();
   },
 );
+
+test('once a folder is open the dashboard takes the place of the Welcome screen', async () => {
+  render(<App />);
+  expect(
+    screen.getByRole('heading', { name: 'A place for your project.' }),
+  ).toBeInTheDocument();
+
+  useWorkspace.setState({
+    workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+  });
+
+  expect(await screen.findByLabelText('Project dashboard')).toBeVisible();
+  expect(
+    screen.queryByRole('heading', { name: 'A place for your project.' }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Dashboard' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  // The dashboard reads local Git on its own; nothing is asked of GitHub while signed out.
+  await waitFor(() => expect(git.status).toHaveBeenCalled());
+  expect(github.counts).not.toHaveBeenCalled();
+});
+
+test('the dashboard hides open files without unmounting the editor, and a tab brings it back', async () => {
+  useWorkspace.setState({
+    workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+    ...openFile,
+  });
+  render(<App />);
+  expect(await screen.findByText('Editor surface')).toBeVisible();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Dashboard' }));
+
+  expect(await screen.findByLabelText('Project dashboard')).toBeVisible();
+  // Unmounting the editor would dispose Monaco's models and cost every tab its undo history.
+  expect(screen.getByText('Editor surface')).not.toBeVisible();
+  fireEvent.click(screen.getByRole('tab', { name: /app\.ts/ }));
+  await waitFor(() => expect(screen.getByText('Editor surface')).toBeVisible());
+  expect(screen.queryByLabelText('Project dashboard')).not.toBeInTheDocument();
+});
+
+test('the dashboard refreshes on focus only while it is on screen', async () => {
+  useWorkspace.setState({
+    workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+  });
+  render(<App />);
+  await screen.findByLabelText('Project dashboard');
+  await waitFor(() => expect(git.status).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(useGit.getState().busy).toBe(false));
+
+  fireEvent.focus(window);
+  await waitFor(() => expect(git.status).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(useGit.getState().busy).toBe(false));
+
+  useWorkspace.setState(openFile);
+  await waitFor(() =>
+    expect(
+      screen.queryByLabelText('Project dashboard'),
+    ).not.toBeInTheDocument(),
+  );
+  fireEvent.focus(window);
+  await waitFor(() => expect(useGit.getState().busy).toBe(false));
+  expect(git.status).toHaveBeenCalledTimes(2);
+});
+
+test('the dashboard links open a panel beside it', async () => {
+  vi.mocked(github.link).mockResolvedValue({
+    status: 'found',
+    remote: 'origin',
+    owner: 'MYY-sudo',
+    repo: 'TBCE',
+  });
+  useWorkspace.setState({
+    workspace: { id: '1', name: 'app', path: 'C:/code/app' },
+  });
+  render(<App />);
+  await screen.findByLabelText('Project dashboard');
+
+  // Signed out, every GitHub card offers the panel where an account is connected.
+  const [connect] = await screen.findAllByRole('button', {
+    name: 'Open GitHub',
+  });
+  fireEvent.click(connect);
+
+  expect(await screen.findByText('GITHUB')).toBeInTheDocument();
+  expect(screen.getByLabelText('Project dashboard')).toBeVisible();
+});

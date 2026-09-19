@@ -17,21 +17,23 @@ import { actions, useGitHub, type GitHubTab } from '../stores/github';
 import { useWorkspace } from '../stores/workspace';
 import { ask } from '../stores/dialog';
 import { IssuesTab } from './IssuesTab';
+import { PullRequestsTab } from './PullRequestsTab';
 import {
   accountLabel,
   dateLabel,
   rateLabel,
   scopeLabel,
 } from '../types/github';
-/// The token GitHub needs, named where the user has to create it. Reading needs the first three
+/// The token GitHub needs, named where the user has to create it. Reading needs the read
 /// permissions; changing issues needs Issues: Read and write.
 const SCOPES =
-  'Create a token at github.com/settings/tokens. A fine-grained token needs Metadata: Read, Contents: Read and Issues: Read, or Issues: Read and write to create, close and reopen issues; a classic token needs repo for private repositories, or public_repo for public ones.';
+  'Create a token at github.com/settings/tokens. A fine-grained token needs Metadata, Contents, Issues, Pull requests, Checks and Commit statuses, all Read, or Issues: Read and write to create, close and reopen issues; a classic token needs repo for private repositories, or public_repo for public ones.';
 const tabs: { id: GitHubTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'branches', label: 'Branches' },
   { id: 'commits', label: 'Commits' },
   { id: 'issues', label: 'Issues' },
+  { id: 'pulls', label: 'Pull requests' },
 ];
 function Detail({ label, value }: { label: string; value: string }) {
   return (
@@ -256,8 +258,7 @@ export function GitHubPanel() {
                     </div>
                     <p className="github-meta">
                       GitHub counts open issues and pull requests together. The
-                      Issues tab lists issues alone; pull requests arrive with
-                      their own milestone.
+                      Issues and Pull requests tabs list each on its own.
                     </p>
                     <div className="github-section">
                       ACTIVITY
@@ -301,6 +302,8 @@ export function GitHubPanel() {
                   </>
                 ) : tab === 'issues' ? (
                   <IssuesTab busy={busy} />
+                ) : tab === 'pulls' ? (
+                  <PullRequestsTab busy={busy} />
                 ) : tab === 'branches' ? (
                   <>
                     <div className="github-section">

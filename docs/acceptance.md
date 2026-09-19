@@ -127,6 +127,46 @@ issues and at least one open pull request.
 81. Turn issues off in the disposable repository's settings and refresh: confirm the tab explains that issues are turned off and makes no issue request. Turn them back on. With a token lacking Issues access entirely, confirm the tab explains that the token cannot read issues while the Overview, Branches and Commits stay correct.
 82. Disconnect the network after typing a new issue and choose Create issue; confirm TBCE reports a failure or an unconfirmed change within the deadline, never a success, and that the draft survives. Reconnect and use Refresh, then confirm on github.com whether the issue exists and that TBCE agrees. Check keyboard navigation through the state buttons, filters, rows, form and dialog, busy-state controls while a change is in flight, and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming every Issues action stays reachable.
 
+## GitHub pull requests — installed-app checks
+
+These exercise the Milestone 10 Pull requests tab. It only reads, so these checks change
+nothing on GitHub, but they need a repository prepared for them: at least one open pull
+request from a branch in the repository, one from a fork, one draft, one merged and one
+closed without merging, more than thirty pull requests in total, and one pull request
+touching more than thirty files including a renamed file and a binary file. Run GitHub
+Actions or another Checks API integration on it, and report at least one commit status
+from outside the Checks API, so both kinds of check exist. Use a fine-grained token with
+Metadata, Contents, Pull requests, Checks and Commit statuses, all Read, and a second
+token lacking Pull requests, Checks and Commit statuses. Compare every value against
+github.com in a browser rather than against TBCE's own display.
+
+83. Choose the Pull requests tab. Confirm switching to the tab makes no request — the rate limit line must not move — and that the open list matches github.com's open pull requests, newest first. Confirm each row's number, title, author, state, source and target branches and labels. Confirm the fork's row names the fork repository and that the draft reads as Draft. Use Load more and confirm the next page is appended, that no pull request appears twice, and that Load more disappears on the last page.
+84. Switch to Closed. Confirm merged pull requests read as Merged with the merge icon and those closed without merging read as Closed, matching github.com. Switch back to Open and confirm the open list returns.
+85. Open a pull request whose description contains Markdown, an HTML tag such as `<b>bold</b>`, an image link, Turkish characters and several paragraphs. Confirm the description is shown exactly as written — the tag appears as text, nothing is rendered or loaded — and that line breaks are kept. Confirm source and target branch, assignees, requested reviewers including a team, milestone, commits, additions, deletions, changed files and comment count against github.com. Confirm the mergeable line reads Not yet known, No conflicts or Has conflicts consistently with github.com's merge box.
+86. On a pull request with passing, failing and in-progress checks, confirm the Checks summary and every listed run and status match the checks list on github.com, including a commit status reported outside GitHub Actions. Refresh while a check is still running and confirm the summary follows it to its result. Confirm a pull request with no checks reads No checks reported.
+87. Confirm the Changed files list matches github.com's Files changed tab: status letter, path, the old and new path of the renamed file, and additions and deletions. Use Load more files and confirm the next page is appended. Choose a file and confirm its patch opens in the editor area, read-only, with the same lines GitHub shows; choose the binary file and confirm TBCE says GitHub sent no patch. Confirm opening a patch made no request.
+88. With a patch open, open a local diff from Source Control and confirm it replaces the patch; open a patch again and confirm it replaces the diff. Confirm an unsaved editor tab keeps its content and undo history across both. Close the patch and confirm the editor returns. Open another folder and confirm the pull request and its patch are gone.
+89. Switch to the token lacking Pull requests access and refresh. Confirm the tab explains that the token cannot read pull requests while Overview, Branches, Commits and Issues stay correct. With a token that can read pull requests but not Checks or Commit statuses, open a pull request and confirm each refusal is explained in the Checks section while the rest of the pull request is shown.
+90. Disconnect the network with a pull request open and use Refresh; confirm TBCE reports that GitHub could not be reached and that editing, saving and local Git keep working. Reconnect and confirm a Refresh restores the pull request. Check keyboard navigation through the tabs, state buttons, rows, file list and patch view, busy-state controls while a read is in flight, and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming the five tabs wrap rather than overflow and every Pull requests action stays reachable.
+
+## Project dashboard — installed-app checks
+
+These exercise the Milestone 11 dashboard. It only reads, so they change nothing on
+GitHub. Use the repository prepared for checks 83–90, give it at least one open
+milestone with a due date and both open and closed issues assigned to it, and keep a
+disposable clone whose `.tbce/project.json` records a stack, an architecture and at
+least two commands. Compare every count against github.com in a browser rather than
+against TBCE's own display.
+
+91. Launch with no folder open and confirm the Welcome screen and its Recent list appear. Open the prepared clone and confirm the dashboard replaces the Welcome screen, the toolbar reads Dashboard and the Dashboard activity button is pressed. Open a file, confirm the editor comes to the front, then use the Dashboard button and confirm the dashboard returns while the file's unsaved edits and undo history survive. Choose the file's tab and confirm the editor returns again.
+92. Confirm the Repository card shows the project name, stack, architecture, `owner/repo`, description as plain text, visibility badges and default branch. Confirm the Commands card lists the manifest's commands exactly, says running them arrives with Milestone 13, and runs nothing. Open a folder that is not a TBCE project and confirm the card says so.
+93. Make a staged change, an unstaged change and an untracked file, and commit twice without pushing. Confirm the Git state card counts each kind and the total, and reports the upstream with two ahead. Confirm the Branch card names the branch, the default branch and the local and remote-tracking counts, and warns about a branch whose upstream was deleted on github.com. Confirm Recent commits lists the last commits newest first, matching `git log`.
+94. Confirm the Issues and Pull requests cards show exactly the open counts github.com shows on its Issues and Pull requests tabs, with issues and pull requests counted apart. Open and close one of each on github.com, use Refresh, and confirm both counts follow. Turn issues off in the repository settings and confirm the Issues card says so; turn them back on.
+95. With the checked-out commit pushed and CI finished, confirm the Build card matches the checks on that commit on github.com, including a failing or pending run when there is one. Make a local commit without pushing and confirm the card says the commit is not on GitHub yet rather than failing. Check out a branch with no CI and confirm it reads No checks reported. In a fresh repository with no commits confirm it reads No commits yet.
+96. Confirm the Milestones card lists open milestones soonest due first, with the same due dates as github.com and a percentage equal to closed over all issues and pull requests assigned. Confirm a milestone with nothing assigned reads nothing assigned rather than 0%. Confirm Project progress says it arrives with Milestone 12.
+97. Use View issues, View pull requests and Open source control, and confirm each opens its panel and tab beside the dashboard. Disconnect the GitHub account and confirm every GitHub card offers to connect while local cards stay correct and the rate limit line in the GitHub panel does not move while the dashboard refreshes. Open a folder with no remote, then one whose remote is not on github.com, and confirm each is explained.
+98. With the dashboard on screen, change a file outside TBCE, switch to another window and back, and confirm the Git state card follows. With a file in front of the dashboard, confirm the same focus change reads nothing for the dashboard. Disconnect the network and use Refresh; confirm the GitHub cards report the failure while local cards, editing and saving keep working. Check keyboard navigation, busy-state controls and scrolling at 1280 × 820 and at the minimum 800 × 540 window size, confirming the cards collapse to one column and every action stays reachable.
+
 ## Milestone 6 prerequisite evidence
 
 Checks 15-42 and the earlier editor gaps listed in the

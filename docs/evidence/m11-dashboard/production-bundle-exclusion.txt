@@ -1,0 +1,79 @@
+Milestone 11 - Project dashboard: production bundle inspection
+Date: 2026-09-19
+Build: npm run tauri build -- --target x86_64-pc-windows-msvc
+Bundle: dist/ as produced by that build (Vite 7, production mode)
+
+Milestones 6 to 10 checked that the development-only Git harness does not ship,
+that the webview names no GitHub host, that the webview sends no write method,
+and that no component sets inner HTML. All four are rechecked. The dashboard
+shows a repository description, milestone titles and commit summaries written
+by other people, so the inner-HTML check matters here too.
+
+$ grep -rl "tbce-git-harness-dev-only" dist/
+(no matches)
+
+$ grep -rl "api.github.com" dist/
+(no matches)
+
+The API host still appears nowhere in the bundle. Commands are named, never an
+endpoint, and the three the dashboard added are among them:
+
+$ grep -oh "github_[a-z_]*" dist/assets/index-*.js dist/assets/Dashboard-*.js | sort -u
+github_account
+github_activity
+github_branches
+github_close_issue
+github_commits
+github_counts
+github_create_issue
+github_head_checks
+github_issue
+github_issue_choices
+github_issues
+github_link
+github_milestones
+github_pull_files
+github_pull_request
+github_pull_requests
+github_reopen_issue
+github_repository
+github_sign_in
+github_sign_out
+
+Searched across every asset, the same pattern also matches one string in
+Monaco's TypeScript worker, ts.worker-*.js: a compiler diagnostic key that
+spells out a github.com URL in words ("..._Slashgithub_com_Slash..."). It is
+not a command and names no API host.
+
+$ grep -rlE "\"(POST|PATCH)\"" dist/assets/
+(no matches)
+
+$ grep -rln "dangerouslySetInnerHTML\|innerHTML" src/
+(no matches)
+
+$ grep -c "dangerouslySetInnerHTML" dist/assets/index-*.js
+1
+
+React's own runtime names the property, which is why the bundle count is not
+zero; no TBCE source file uses it or innerHTML, which is the claim that
+matters.
+
+$ ls dist/assets | grep -iE "harness|github|issue|pull|patch|diff|dashboard"
+Dashboard-BFIeBY0O.js
+DiffView-BZQSs0wE.js
+PatchView-Cvy5b9YJ.js
+PullFileView-CFOY5h7w.js
+
+The dashboard is a lazy chunk of its own, loaded the first time it is shown,
+like DiffView and PullFileView. The dashboard store and the shared Recent list
+ship in the main entry chunk, because the application shell uses both. The
+other lazy chunks are unchanged: Editor and TerminalPanel.
+
+$ git diff HEAD --stat -- src-tauri/tauri.conf.json
+(no output)
+
+$ grep -o "connect-src[^\"]*" src-tauri/tauri.conf.json
+connect-src ipc: http://ipc.localhost; worker-src 'self' blob:
+
+The content security policy is unchanged by this milestone. The webview can
+make no request of its own and load no remote image.

@@ -14,6 +14,9 @@ import type {
   GitHubIssueDetail,
   GitHubLink,
   GitHubPage,
+  GitHubPullFile,
+  GitHubPullRequest,
+  GitHubPullRequestDetail,
   GitHubRepository,
 } from '../src/types/github';
 vi.mock('../src/services/github', () => ({
@@ -32,6 +35,9 @@ vi.mock('../src/services/github', () => ({
     createIssue: vi.fn(),
     closeIssue: vi.fn(),
     reopenIssue: vi.fn(),
+    pullRequests: vi.fn(),
+    pullRequest: vi.fn(),
+    pullFiles: vi.fn(),
   },
 }));
 vi.mock('../src/services/filesystem', () => ({
@@ -131,6 +137,7 @@ beforeEach(() => {
   vi.mocked(github.commits).mockResolvedValue(page([commit], true));
   vi.mocked(github.activity).mockResolvedValue(page([]));
   vi.mocked(github.issues).mockResolvedValue(page([issue]));
+  vi.mocked(github.pullRequests).mockResolvedValue(page([]));
   vi.mocked(github.issueChoices).mockResolvedValue({
     labels: [
       { name: 'bug', color: 'd73a4a', description: 'Something is broken' },
@@ -589,6 +596,274 @@ test('a change in flight disables every issue action', async () => {
     expect(screen.getByRole('button', { name: 'Close issue' })).toBeDisabled(),
   );
   expect(screen.getByRole('button', { name: 'Back to issues' })).toBeDisabled();
+  expect(
+    screen.getByRole('button', { name: 'Disconnect account' }),
+  ).toBeEnabled();
+});
+
+const pull: GitHubPullRequest = {
+  number: 12,
+  title: 'Oturum açma akışı',
+  state: 'open',
+  draft: false,
+  merged: false,
+  author: 'oyku',
+  head: {
+    reference: 'feature/auth',
+    label: 'MYY-sudo:feature/auth',
+    sha: 'c'.repeat(40),
+    repository: 'MYY-sudo/TBCE',
+  },
+  base: { reference: 'main' },
+  crossRepository: false,
+  labels: [{ name: 'ui', color: 'a2eeef' }],
+  assignees: [],
+  reviewers: ['octocat', 'Core'],
+  milestone: null,
+  createdAt: '2026-09-18T10:00:00Z',
+  updatedAt: null,
+  closedAt: null,
+  mergedAt: null,
+};
+const pullDetail = (
+  changes: Partial<GitHubPullRequestDetail> = {},
+): GitHubPullRequestDetail => ({
+  ...pull,
+  body: 'Özet',
+  commits: 2,
+  additions: 10,
+  deletions: 1,
+  changedFiles: 2,
+  comments: 1,
+  reviewComments: 2,
+  mergeable: null,
+  mergeableState: 'unknown',
+  checks: {
+    summary: 'failing',
+    entries: [
+      {
+        name: 'build',
+        source: 'run',
+        outcome: 'failing',
+        state: 'timed_out',
+        description: 'GitHub Actions',
+      },
+      {
+        name: 'ci/legacy',
+        source: 'status',
+        outcome: 'passing',
+        state: 'success',
+        description: null,
+      },
+    ],
+    truncated: false,
+    runsDenied: false,
+    statusesDenied: false,
+    missing: false,
+    error: null,
+  },
+  rate: null,
+  ...changes,
+});
+const changed: GitHubPullFile[] = [
+  {
+    path: 'src/auth.ts',
+    previousPath: null,
+    status: 'modified',
+    additions: 8,
+    deletions: 1,
+    patch: '@@ -1 +1 @@\n-a\n+b',
+  },
+  {
+    path: 'src/login.ts',
+    previousPath: 'src/signin.ts',
+    status: 'renamed',
+    additions: 2,
+    deletions: 0,
+    patch: null,
+  },
+];
+async function pullsTab() {
+  vi.mocked(github.pullRequests).mockResolvedValue(page([pull], true));
+  await open();
+  fireEvent.click(screen.getByRole('tab', { name: 'Pull requests' }));
+  await screen.findByText('OPEN PULL REQUESTS');
+}
+async function openPull(detail = pullDetail()) {
+  vi.mocked(github.pullRequest).mockResolvedValue(detail);
+  vi.mocked(github.pullFiles).mockResolvedValue(page(changed));
+  await pullsTab();
+  fireEvent.click(screen.getByRole('button', { name: /Oturum açma akışı/ }));
+  await screen.findByText('CHANGED FILES');
+}
+
+test('the pull requests tab shows what the refresh read without reading again', async () => {
+  await pullsTab();
+  vi.mocked(github.pullRequests).mockClear();
+
+  expect(screen.getByText('Oturum açma akışı')).toBeInTheDocument();
+  expect(screen.getByText('feature/auth → main')).toBeInTheDocument();
+  expect(screen.getByText(/#12 · oyku · Open/)).toBeInTheDocument();
+  expect(screen.getByText('ui')).toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: 'Load more pull requests' }),
+  ).toBeEnabled();
+  expect(github.pullRequests).not.toHaveBeenCalled();
+  expect(github.pullRequest).not.toHaveBeenCalled();
+});
+
+test('merged, closed, draft and forked pull requests read as what they are', async () => {
+  vi.mocked(github.pullRequests).mockResolvedValue(
+    page([
+      {
+        ...pull,
+        number: 1,
+        title: 'Merged one',
+        state: 'closed',
+        merged: true,
+      },
+      { ...pull, number: 2, title: 'Closed one', state: 'closed' },
+      { ...pull, number: 3, title: 'Draft one', draft: true },
+      {
+        ...pull,
+        number: 4,
+        title: 'Fork one',
+        crossRepository: true,
+        head: { ...pull.head, repository: 'someone/TBCE' },
+      },
+      {
+        ...pull,
+        number: 5,
+        title: 'Gone one',
+        crossRepository: true,
+        head: { ...pull.head, repository: null },
+      },
+    ]),
+  );
+  await open();
+  fireEvent.click(screen.getByRole('tab', { name: 'Pull requests' }));
+
+  expect(await screen.findByText(/#1 · oyku · Merged/)).toBeInTheDocument();
+  expect(screen.getByText(/#2 · oyku · Closed/)).toBeInTheDocument();
+  expect(screen.getByText(/#3 · oyku · Draft/)).toBeInTheDocument();
+  expect(
+    screen.getByText('someone/TBCE:feature/auth → main'),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText('feature/auth (deleted fork) → main'),
+  ).toBeInTheDocument();
+});
+
+test('the closed pull requests are one press away', async () => {
+  await pullsTab();
+  vi.mocked(github.pullRequests).mockResolvedValue(page([]));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Closed' }));
+
+  expect(
+    await screen.findByText('No closed pull requests.'),
+  ).toBeInTheDocument();
+  expect(github.pullRequests).toHaveBeenLastCalledWith('1', 'closed', 1);
+});
+
+test('a pull request shows its branches, people, counts and checks', async () => {
+  await openPull();
+
+  expect(github.pullRequest).toHaveBeenCalledWith('1', 12);
+  expect(github.pullFiles).toHaveBeenCalledWith('1', 12, 1);
+  expect(screen.getByText('Source').nextSibling).toHaveTextContent(
+    'feature/auth',
+  );
+  expect(screen.getByText('Target').nextSibling).toHaveTextContent('main');
+  expect(screen.getByText('octocat, Core')).toBeInTheDocument();
+  expect(screen.getByText('Not yet known')).toBeInTheDocument();
+  expect(screen.getByText('2 commits')).toBeInTheDocument();
+  expect(screen.getByText('3 comments')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('1 of 2 checks failing');
+  expect(screen.getByText('build')).toBeInTheDocument();
+  expect(screen.getByText('timed out')).toBeInTheDocument();
+  expect(screen.getByText('ci/legacy')).toBeInTheDocument();
+  expect(screen.getByText(/not part of this release/)).toBeInTheDocument();
+});
+
+test('a pull request description is shown as text and never interpreted as markup', async () => {
+  await openPull(
+    pullDetail({
+      body: '<img src=x onerror="alert(1)"><b>kalın</b>\n## başlık',
+    }),
+  );
+
+  const body = screen.getByText(/<img src=x/);
+  expect(body.tagName).toBe('PRE');
+  expect(body).toHaveTextContent('## başlık');
+  expect(document.querySelector('.github-body img')).toBeNull();
+  expect(document.querySelector('.github-body b')).toBeNull();
+});
+
+test('refused and failed checks are explained beside the pull request', async () => {
+  await openPull(
+    pullDetail({
+      checks: {
+        summary: 'none',
+        entries: [],
+        truncated: false,
+        runsDenied: true,
+        statusesDenied: true,
+        missing: false,
+        error: null,
+      },
+    }),
+  );
+
+  expect(screen.getByText(/cannot read check runs/)).toBeInTheDocument();
+  expect(screen.getByText(/cannot read commit statuses/)).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('No checks reported');
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('changed files are listed and a press opens the patch without a request', async () => {
+  await openPull();
+  vi.mocked(github.pullFiles).mockClear();
+
+  expect(
+    screen.getByRole('button', { name: /src\/signin.ts → src\/login.ts/ }),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /src\/auth.ts/ }));
+
+  expect(useGitHub.getState().pullFile).toEqual({
+    number: 12,
+    file: changed[0],
+  });
+  expect(github.pullFiles).not.toHaveBeenCalled();
+});
+
+test('a token that cannot read pull requests is explained in the tab alone', async () => {
+  vi.mocked(github.pullRequests).mockRejectedValue({
+    code: 'GITHUB_FORBIDDEN',
+    message: 'no access',
+  });
+  await open();
+  expect(screen.queryByRole('alert')).toBeNull();
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Pull requests' }));
+
+  expect(
+    await screen.findByText(/cannot read pull requests/),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('a read in flight disables every pull request action', async () => {
+  await openPull();
+
+  useGitHub.setState({ dataBusy: true });
+
+  await vi.waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Back to pull requests' }),
+    ).toBeDisabled(),
+  );
+  expect(screen.getByRole('button', { name: /src\/auth.ts/ })).toBeDisabled();
   expect(
     screen.getByRole('button', { name: 'Disconnect account' }),
   ).toBeEnabled();

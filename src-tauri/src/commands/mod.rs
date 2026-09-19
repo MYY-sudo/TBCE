@@ -538,6 +538,85 @@ pub async fn github_issue_choices(
     let (owner, repo) = linked(&app, workspace_id).await?;
     github_task(app, move |service| service.issue_choices(&owner, &repo)).await
 }
+#[tauri::command]
+pub async fn github_pull_requests(
+    app: AppHandle,
+    workspace_id: String,
+    state: github::PullState,
+    page: u32,
+) -> Result<github::Page<github::PullRequest>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.pull_requests(&owner, &repo, state, page)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn github_pull_request(
+    app: AppHandle,
+    workspace_id: String,
+    number: u64,
+) -> Result<github::PullRequestDetail> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.pull_request(&owner, &repo, number)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn github_pull_files(
+    app: AppHandle,
+    workspace_id: String,
+    number: u64,
+    page: u32,
+) -> Result<github::Page<github::PullFile>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.pull_files(&owner, &repo, number, page)
+    })
+    .await
+}
+// The dashboard's three reads. Like the rest, they name no repository and no commit.
+#[tauri::command]
+pub async fn github_counts(app: AppHandle, workspace_id: String) -> Result<github::Counts> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.counts(&owner, &repo)).await
+}
+#[tauri::command]
+pub async fn github_milestones(
+    app: AppHandle,
+    workspace_id: String,
+) -> Result<github::Page<github::Milestone>> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| service.milestones(&owner, &repo)).await
+}
+#[tauri::command]
+pub async fn github_head_checks(
+    app: AppHandle,
+    workspace_id: String,
+) -> Result<github::HeadChecks> {
+    // The commit is read from the repository under the Git lock, which is released before anything
+    // is sent, so the webview cannot choose which commit GitHub is asked about.
+    let (owner, repo, oid) = git_task(app.clone(), workspace_id, |root, _| {
+        let (owner, repo) = github::linked(&root)?;
+        Ok((owner, repo, head_commit(&root)))
+    })
+    .await?;
+    github_task(app, move |service| {
+        service.head_checks(&owner, &repo, oid.as_deref())
+    })
+    .await
+}
+/// The commit HEAD points at, or nothing on a branch with no commits yet.
+fn head_commit(root: &Path) -> Option<String> {
+    match GitService::detect(root) {
+        git::Detection::Found { repository } => match repository.head {
+            git::Head::Branch { oid, .. } | git::Head::Detached { oid } => Some(oid),
+            git::Head::Unborn { .. } => None,
+        },
+        _ => None,
+    }
+}
 // The three commands below change GitHub. Like the reads, they name no repository: the target is
 // the open folder's own remote, resolved here, so the webview cannot aim a write elsewhere.
 #[tauri::command]

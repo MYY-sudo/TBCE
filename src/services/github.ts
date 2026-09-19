@@ -5,6 +5,8 @@ import type {
   GitHubBranch,
   GitHubCloseReason,
   GitHubCommit,
+  GitHubCounts,
+  GitHubHeadChecks,
   GitHubIssue,
   GitHubIssueChoices,
   GitHubIssueCreated,
@@ -12,7 +14,12 @@ import type {
   GitHubIssueDraft,
   GitHubIssueFilter,
   GitHubLink,
+  GitHubMilestone,
   GitHubPage,
+  GitHubPullFile,
+  GitHubPullRequest,
+  GitHubPullRequestDetail,
+  GitHubPullState,
   GitHubRepository,
 } from '../types/github';
 function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -26,7 +33,7 @@ function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
 }
 // No call names a host, a path or a header: the backend builds every request from a workspace
 // identifier, a page number and values it checks. signIn is the only call that carries a token, and
-// nothing returns one. The three issue changes are the only calls that write to GitHub.
+// nothing returns one. The three issue changes are still the only calls that write to GitHub.
 export const github = {
   account: () => call<GitHubAccount>('github_account'),
   signIn: (token: string) => call<GitHubAccount>('github_sign_in', { token }),
@@ -70,4 +77,29 @@ export const github = {
     }),
   reopenIssue: (workspaceId: string, number: number) =>
     call<GitHubIssueDetail>('github_reopen_issue', { workspaceId, number }),
+  // Pull requests are read and never written.
+  pullRequests: (workspaceId: string, state: GitHubPullState, page = 1) =>
+    call<GitHubPage<GitHubPullRequest>>('github_pull_requests', {
+      workspaceId,
+      state,
+      page,
+    }),
+  pullRequest: (workspaceId: string, number: number) =>
+    call<GitHubPullRequestDetail>('github_pull_request', {
+      workspaceId,
+      number,
+    }),
+  pullFiles: (workspaceId: string, number: number, page = 1) =>
+    call<GitHubPage<GitHubPullFile>>('github_pull_files', {
+      workspaceId,
+      number,
+      page,
+    }),
+  // The dashboard's reads. The commit whose checks are read comes from the repository, not from here.
+  counts: (workspaceId: string) =>
+    call<GitHubCounts>('github_counts', { workspaceId }),
+  milestones: (workspaceId: string) =>
+    call<GitHubPage<GitHubMilestone>>('github_milestones', { workspaceId }),
+  headChecks: (workspaceId: string) =>
+    call<GitHubHeadChecks>('github_head_checks', { workspaceId }),
 };

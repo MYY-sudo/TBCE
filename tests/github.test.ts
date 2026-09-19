@@ -1,11 +1,16 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { actions, useGitHub } from '../src/stores/github';
 import { useWorkspace } from '../src/stores/workspace';
+import { useGit } from '../src/stores/git';
 import { github } from '../src/services/github';
 import { fileSystem } from '../src/services/filesystem';
 import {
   accountLabel,
+  checksLabel,
   droppedLabel,
+  mergeableLabel,
+  pullStateLabel,
+  sourceLabel,
   issueStateLabel,
   matchesFilter,
   rateLabel,
@@ -19,6 +24,9 @@ import type {
   GitHubIssueChoices,
   GitHubIssueDetail,
   GitHubPage,
+  GitHubPullFile,
+  GitHubPullRequest,
+  GitHubPullRequestDetail,
   GitHubRepository,
 } from '../src/types/github';
 vi.mock('../src/services/github', () => ({
@@ -37,6 +45,9 @@ vi.mock('../src/services/github', () => ({
     createIssue: vi.fn(),
     closeIssue: vi.fn(),
     reopenIssue: vi.fn(),
+    pullRequests: vi.fn(),
+    pullRequest: vi.fn(),
+    pullFiles: vi.fn(),
   },
 }));
 vi.mock('../src/services/filesystem', () => ({
@@ -131,6 +142,74 @@ const choices: GitHubIssueChoices = {
   truncated: false,
   rate: null,
 };
+const pull: GitHubPullRequest = {
+  number: 12,
+  title: 'Oturum açma akışı',
+  state: 'open',
+  draft: false,
+  merged: false,
+  author: 'oyku',
+  head: {
+    reference: 'feature/auth',
+    label: 'MYY-sudo:feature/auth',
+    sha: 'c'.repeat(40),
+    repository: 'MYY-sudo/TBCE',
+  },
+  base: { reference: 'main' },
+  crossRepository: false,
+  labels: [],
+  assignees: [],
+  reviewers: ['octocat'],
+  milestone: null,
+  createdAt: '2026-09-18T10:00:00Z',
+  updatedAt: null,
+  closedAt: null,
+  mergedAt: null,
+};
+const pullDetail = (
+  changes: Partial<GitHubPullRequestDetail> = {},
+): GitHubPullRequestDetail => ({
+  ...pull,
+  body: 'Özet',
+  commits: 2,
+  additions: 10,
+  deletions: 1,
+  changedFiles: 2,
+  comments: 0,
+  reviewComments: 0,
+  mergeable: true,
+  mergeableState: 'clean',
+  checks: {
+    summary: 'passing',
+    entries: [
+      {
+        name: 'build',
+        source: 'run',
+        outcome: 'passing',
+        state: 'success',
+        description: 'GitHub Actions',
+      },
+    ],
+    truncated: false,
+    runsDenied: false,
+    statusesDenied: false,
+    missing: false,
+    error: null,
+  },
+  rate: null,
+  ...changes,
+});
+const file = (
+  path: string,
+  patch: string | null = '@@ -1 +1 @@',
+): GitHubPullFile => ({
+  path,
+  previousPath: null,
+  status: 'modified',
+  additions: 1,
+  deletions: 1,
+  patch,
+});
 const openFilter = {
   state: 'open',
   label: null,
@@ -158,6 +237,7 @@ async function connect() {
   vi.mocked(github.commits).mockResolvedValue(page([commit]));
   vi.mocked(github.activity).mockResolvedValue(page([]));
   vi.mocked(github.issues).mockResolvedValue(page([issue, other], true));
+  vi.mocked(github.pullRequests).mockResolvedValue(page([pull], true));
   useWorkspace.setState({ workspace });
   await vi.waitFor(() =>
     expect(useGitHub.getState().link.status).toBe('found'),
@@ -1020,4 +1100,312 @@ test('issue labels explain state, filters and what GitHub left out', () => {
   expect(
     droppedLabel({ labels: [], assignees: ['oyku'], milestone: false }),
   ).toContain('assignees oyku');
+});
+
+test('one refresh also reads the first page of open pull requests', async () => {
+  await connect();
+
+  expect(github.pullRequests).toHaveBeenCalledWith('1', 'open', 1);
+  expect(useGitHub.getState()).toMatchObject({
+    pulls: [pull],
+    pullsMore: true,
+    pullsDenied: false,
+    pullsError: null,
+  });
+});
+
+test('switching to the pull requests tab reads nothing', async () => {
+  await connect();
+  vi.mocked(github.pullRequests).mockClear();
+
+  actions.setTab('pulls');
+
+  expect(useGitHub.getState().tab).toBe('pulls');
+  expect(github.pullRequests).not.toHaveBeenCalled();
+  expect(github.pullRequest).not.toHaveBeenCalled();
+});
+
+test('a token that cannot read pull requests leaves the rest of the refresh intact', async () => {
+  vi.mocked(github.pullRequests).mockRejectedValue({
+    code: 'GITHUB_FORBIDDEN',
+    message: 'Resource not accessible by personal access token',
+  });
+  await connect();
+  vi.mocked(github.pullRequests).mockRejectedValue({
+    code: 'GITHUB_FORBIDDEN',
+    message: 'Resource not accessible by personal access token',
+  });
+  await actions.refresh();
+
+  expect(useGitHub.getState()).toMatchObject({
+    repository,
+    issues: [issue, other],
+    pulls: [],
+    pullsDenied: true,
+    pullsError: null,
+    error: null,
+  });
+});
+
+test('another pull request failure is kept in the tab rather than the panel', async () => {
+  await connect();
+  vi.mocked(github.pullRequests).mockRejectedValue({
+    code: 'GITHUB_UNAVAILABLE',
+    message: 'GitHub is not answering correctly right now.',
+  });
+
+  await actions.refresh();
+
+  expect(useGitHub.getState()).toMatchObject({
+    repository,
+    pullsDenied: false,
+    pullsError: 'GitHub is not answering correctly right now.',
+    error: null,
+  });
+});
+
+test('the closed list is read, and the state is kept only once GitHub answers', async () => {
+  await connect();
+  const merged = { ...pull, number: 3, state: 'closed' as const, merged: true };
+  vi.mocked(github.pullRequests).mockResolvedValueOnce(page([merged]));
+
+  expect(await actions.setPullState('closed')).toBe(true);
+  expect(github.pullRequests).toHaveBeenLastCalledWith('1', 'closed', 1);
+  expect(useGitHub.getState()).toMatchObject({
+    pullState: 'closed',
+    pulls: [merged],
+    pullsMore: false,
+  });
+
+  vi.mocked(github.pullRequests).mockRejectedValueOnce({
+    code: 'GITHUB_TIMED_OUT',
+    message: 'GitHub did not answer in time.',
+  });
+  expect(await actions.setPullState('open')).toBe(false);
+  expect(useGitHub.getState()).toMatchObject({
+    pullState: 'closed',
+    pulls: [merged],
+    error: 'GitHub did not answer in time.',
+  });
+});
+
+test('another page of pull requests is appended without repeating one', async () => {
+  await connect();
+  const older = { ...pull, number: 11, title: 'Older' };
+  vi.mocked(github.pullRequests).mockResolvedValueOnce(page([pull, older]));
+
+  expect(await actions.morePulls()).toBe(true);
+
+  expect(github.pullRequests).toHaveBeenLastCalledWith('1', 'open', 2);
+  expect(useGitHub.getState().pulls.map((entry) => entry.number)).toEqual([
+    12, 11,
+  ]);
+  expect(useGitHub.getState().pullsMore).toBe(false);
+});
+
+test('opening a pull request reads it with its checks and then its files', async () => {
+  await connect();
+  vi.mocked(github.pullRequest).mockResolvedValue(pullDetail());
+  vi.mocked(github.pullFiles).mockResolvedValue(
+    page([file('src/a.ts'), file('src/b.ts')], true),
+  );
+
+  expect(await actions.openPull(12)).toBe(true);
+
+  expect(github.pullRequest).toHaveBeenCalledWith('1', 12);
+  expect(github.pullFiles).toHaveBeenCalledWith('1', 12, 1);
+  expect(useGitHub.getState()).toMatchObject({
+    selectedPull: { number: 12, checks: { summary: 'passing' } },
+    pullFiles: [{ path: 'src/a.ts' }, { path: 'src/b.ts' }],
+    pullFilesMore: true,
+    pullFilesError: null,
+  });
+
+  vi.mocked(github.pullFiles).mockResolvedValueOnce(
+    page([file('src/b.ts'), file('src/c.ts')]),
+  );
+  expect(await actions.moreFiles()).toBe(true);
+  expect(github.pullFiles).toHaveBeenLastCalledWith('1', 12, 2);
+  expect(useGitHub.getState().pullFiles.map((entry) => entry.path)).toEqual([
+    'src/a.ts',
+    'src/b.ts',
+    'src/c.ts',
+  ]);
+});
+
+test('files that cannot be read leave the pull request readable', async () => {
+  await connect();
+  vi.mocked(github.pullRequest).mockResolvedValue(pullDetail());
+  vi.mocked(github.pullFiles).mockRejectedValue({
+    code: 'GITHUB_RESPONSE_INVALID',
+    message: 'GitHub returned more data than TBCE will read.',
+  });
+
+  expect(await actions.openPull(12)).toBe(true);
+
+  expect(useGitHub.getState()).toMatchObject({
+    selectedPull: { number: 12 },
+    pullFiles: [],
+    pullFilesError: 'GitHub returned more data than TBCE will read.',
+    error: null,
+  });
+});
+
+test('an open pull request and its patch are read again on refresh', async () => {
+  await connect();
+  vi.mocked(github.pullRequest).mockResolvedValue(pullDetail());
+  vi.mocked(github.pullFiles).mockResolvedValue(
+    page([file('src/a.ts', 'old'), file('src/b.ts')]),
+  );
+  await actions.openPull(12);
+  actions.openPullFile(useGitHub.getState().pullFiles[0]);
+  vi.mocked(github.pullRequest).mockResolvedValue(
+    pullDetail({ title: 'Renamed on GitHub' }),
+  );
+  vi.mocked(github.pullFiles).mockResolvedValue(
+    page([file('src/a.ts', 'new')]),
+  );
+
+  await actions.refresh();
+
+  expect(useGitHub.getState().selectedPull?.title).toBe('Renamed on GitHub');
+  expect(useGitHub.getState().pullFile).toEqual({
+    number: 12,
+    file: file('src/a.ts', 'new'),
+  });
+
+  vi.mocked(github.pullFiles).mockResolvedValue(page([file('src/b.ts')]));
+  await actions.refresh();
+  expect(useGitHub.getState().pullFile).toBeNull();
+});
+
+test('a pull request patch and a local diff never share the editor area', async () => {
+  await connect();
+  vi.mocked(github.pullRequest).mockResolvedValue(pullDetail());
+  vi.mocked(github.pullFiles).mockResolvedValue(page([file('src/a.ts')]));
+  await actions.openPull(12);
+  useGit.setState({
+    selected: { path: 'src/a.ts', staged: false },
+    diff: null,
+  });
+
+  actions.openPullFile(useGitHub.getState().pullFiles[0]);
+
+  expect(useGit.getState().selected).toBeNull();
+  expect(useGitHub.getState().pullFile?.file.path).toBe('src/a.ts');
+  expect(github.pullFiles).toHaveBeenCalledTimes(1);
+
+  useGit.setState({ selected: { path: 'src/b.ts', staged: true } });
+  expect(useGitHub.getState().pullFile).toBeNull();
+});
+
+test('the answer for a pull request of a replaced folder is discarded', async () => {
+  await connect();
+  let release!: (value: GitHubPullRequestDetail) => void;
+  vi.mocked(github.pullRequest).mockImplementationOnce(
+    () => new Promise((resolve) => (release = resolve)),
+  );
+  const pending = actions.openPull(12);
+  await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+  useWorkspace.setState({ workspace: { ...workspace, id: '2' } });
+  release(pullDetail());
+
+  expect(await pending).toBe(false);
+  expect(useGitHub.getState().selectedPull).toBeNull();
+  expect(github.pullFiles).not.toHaveBeenCalled();
+});
+
+test('opening another folder forgets the pull requests and the open patch', async () => {
+  await connect();
+  vi.mocked(github.pullRequest).mockResolvedValue(pullDetail());
+  vi.mocked(github.pullFiles).mockResolvedValue(page([file('src/a.ts')]));
+  await actions.setPullState('closed');
+  await actions.openPull(12);
+  actions.openPullFile(useGitHub.getState().pullFiles[0]);
+  vi.mocked(github.link).mockResolvedValue({ status: 'noRepository' });
+
+  useWorkspace.setState({ workspace: { id: '2', name: 'o', path: 'C:/o' } });
+  await vi.waitFor(() =>
+    expect(useGitHub.getState().link.status).toBe('noRepository'),
+  );
+
+  expect(useGitHub.getState()).toMatchObject({
+    pulls: [],
+    pullState: 'open',
+    selectedPull: null,
+    pullFiles: [],
+    pullFile: null,
+  });
+});
+
+test('going back to the list forgets the pull request and its patch', async () => {
+  await connect();
+  vi.mocked(github.pullRequest).mockResolvedValue(pullDetail());
+  vi.mocked(github.pullFiles).mockResolvedValue(page([file('src/a.ts')]));
+  await actions.openPull(12);
+  actions.openPullFile(useGitHub.getState().pullFiles[0]);
+
+  actions.backToPulls();
+
+  expect(useGitHub.getState()).toMatchObject({
+    selectedPull: null,
+    pullFiles: [],
+    pullFile: null,
+    pulls: [pull],
+  });
+});
+
+test('pull request labels explain state, source, checks and merging', () => {
+  expect(pullStateLabel(pull)).toBe('Open');
+  expect(pullStateLabel({ ...pull, draft: true })).toBe('Draft');
+  expect(pullStateLabel({ ...pull, state: 'closed' })).toBe('Closed');
+  expect(pullStateLabel({ ...pull, state: 'closed', merged: true })).toBe(
+    'Merged',
+  );
+  expect(sourceLabel(pull)).toBe('feature/auth');
+  expect(
+    sourceLabel({
+      ...pull,
+      crossRepository: true,
+      head: { ...pull.head, repository: 'someone/TBCE' },
+    }),
+  ).toBe('someone/TBCE:feature/auth');
+  expect(
+    sourceLabel({
+      ...pull,
+      crossRepository: true,
+      head: { ...pull.head, repository: null },
+    }),
+  ).toBe('feature/auth (deleted fork)');
+  const checks = pullDetail().checks;
+  expect(checksLabel(checks)).toBe('All 1 checks passed');
+  expect(
+    checksLabel({
+      ...checks,
+      entries: [
+        ...checks.entries,
+        { ...checks.entries[0], name: 'docs', outcome: 'neutral' },
+      ],
+    }),
+  ).toBe('1 passed, 1 skipped or neutral');
+  expect(
+    checksLabel({
+      ...checks,
+      summary: 'failing',
+      entries: [{ ...checks.entries[0], outcome: 'failing' }],
+    }),
+  ).toBe('1 of 1 checks failing');
+  expect(checksLabel({ ...checks, summary: 'none', entries: [] })).toBe(
+    'No checks reported',
+  );
+  expect(mergeableLabel(pullDetail({ mergeable: null }))).toBe('Not yet known');
+  expect(mergeableLabel(pullDetail({ mergeable: false }))).toBe(
+    'Has conflicts',
+  );
+  expect(mergeableLabel(pullDetail({ mergeableState: 'blocked' }))).toBe(
+    'Blocked by branch rules',
+  );
+  expect(mergeableLabel(pullDetail({ merged: true, state: 'closed' }))).toBe(
+    '—',
+  );
 });

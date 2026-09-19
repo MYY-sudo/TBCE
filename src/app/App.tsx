@@ -16,14 +16,21 @@ import {
   Blocks,
   GitBranch,
   Github,
+  LayoutDashboard,
 } from 'lucide-react';
 import { actions, useWorkspace } from '../stores/workspace';
 import { actions as terminalActions, useTerminal } from '../stores/terminal';
 import { actions as projectActions, useProject } from '../stores/project';
 import { actions as gitActions, useGit } from '../stores/git';
-import { actions as githubActions } from '../stores/github';
+import {
+  actions as githubActions,
+  useGitHub,
+  type GitHubTab,
+} from '../stores/github';
+import { actions as dashboardActions, useDashboard } from '../stores/dashboard';
 import { useDialog } from '../stores/dialog';
 import { Dialog } from '../components/Dialog';
+import { RecentProjects } from '../components/RecentProjects';
 import { Explorer } from '../explorer/Explorer';
 import { fileName, isDirty } from '../types/workspace';
 import { guardWindowClose } from '../services/window';
@@ -34,6 +41,8 @@ import { SourceControlPanel } from '../git/SourceControlPanel';
 import { GitHubPanel } from '../github/GitHubPanel';
 const Editor = lazy(() => import('../editor/Editor'));
 const DiffView = lazy(() => import('../git/DiffView'));
+const PullFileView = lazy(() => import('../github/PullFileView'));
+const Dashboard = lazy(() => import('../dashboard/Dashboard'));
 const TerminalPanel = lazy(() => import('../terminal/TerminalPanel'));
 // Development only. Vite substitutes this flag with a literal false in a production build, so the
 // branch and its dynamic import are removed and no Git harness chunk is ever emitted.
@@ -44,18 +53,32 @@ export function App() {
   const state = useWorkspace();
   const terminalVisible = useTerminal((s) => s.visible);
   const terminalSession = useTerminal((s) => s.session);
-  const recent = useProject((s) => s.recent);
   const projectBusy = useProject((s) => s.busy);
   const projectError = useProject((s) => s.error);
   const diff = useGit((s) => s.selected);
+  const pullFile = useGitHub((s) => s.pullFile);
+  // A local diff and a pull request patch share the editor area; the local diff wins if both exist.
+  const patch = Boolean(diff || pullFile);
+  const dashboardOpen = useDashboard((s) => s.open);
   const [sidebar, setSidebar] = useState(true);
   const [panel, setPanel] = useState<
     'explorer' | 'git' | 'github' | 'stacks' | 'architectures'
   >('explorer');
   const [newProject, setNewProject] = useState(false);
+  // The dashboard's links open a sidebar panel beside it rather than replacing it.
+  const navigate = (target: 'git' | 'github', tab?: GitHubTab) => {
+    if (tab) githubActions.setTab(tab);
+    setPanel(target);
+    setSidebar(true);
+  };
   const [width, setWidth] = useState(252);
   const [dock, setDock] = useState(248);
   const active = state.tabs.find((t) => t.id === state.activeId);
+  // With a folder open the dashboard takes the place of the Welcome screen, and it can be brought
+  // in front of open files. A diff or patch still wins, because opening one is the latest choice.
+  const dashboard = !patch && !!state.workspace && (dashboardOpen || !active);
+  const dashboardVisible = useRef(dashboard);
+  dashboardVisible.current = dashboard;
   // The focus listener is installed once, so it reads the visible panel through a ref instead of
   // capturing it. Git and GitHub are refreshed only while their own panel is on screen.
   const visible = useRef<typeof panel | null>(panel);
@@ -89,6 +112,7 @@ export function App() {
       void actions.checkExternal();
       if (visible.current === 'git') void gitActions.refresh();
       if (visible.current === 'github') void githubActions.refresh();
+      if (dashboardVisible.current) void dashboardActions.refreshAll();
     };
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (useWorkspace.getState().tabs.some(isDirty)) {
@@ -120,7 +144,7 @@ export function App() {
         <span className="toolbar-context">
           {state.workspace?.name ?? 'Workspace'}
           <span className="context-slash">/</span>
-          <span className="muted">Editor</span>
+          <span className="muted">{dashboard ? 'Dashboard' : 'Editor'}</span>
         </span>
         <div className="toolbar-actions">
           <button
@@ -165,6 +189,16 @@ export function App() {
       </header>
       <div className="workbench">
         <nav className="activity-bar" aria-label="Workspace navigation">
+          <button
+            className={dashboard ? 'activity-active' : ''}
+            title="Dashboard"
+            aria-label="Dashboard"
+            aria-pressed={dashboard}
+            disabled={!state.workspace}
+            onClick={dashboardActions.show}
+          >
+            <LayoutDashboard size={20} />
+          </button>
           <button
             className={panel === 'explorer' && sidebar ? 'activity-active' : ''}
             title="Explorer"
@@ -283,7 +317,10 @@ export function App() {
                   aria-selected={state.activeId === tab.id}
                   title={tab.path}
                   disabled={state.busy}
-                  onClick={() => actions.activate(tab.id)}
+                  onClick={() => {
+                    dashboardActions.hide();
+                    actions.activate(tab.id);
+                  }}
                 >
                   <Code2 size={14} />
                   <span>{fileName(tab.path)}</span>
@@ -346,7 +383,7 @@ export function App() {
           {/* The editor is hidden rather than unmounted while a diff is open. Unmounting it
               disposes Monaco's models, which would cost every tab its undo history. */}
           {active && (
-            <div className="editor-stack" hidden={!!diff}>
+            <div className="editor-stack" hidden={patch || dashboard}>
               <div className="breadcrumbs">
                 <span>{state.workspace?.name}</span>
                 <span>/</span>
@@ -364,7 +401,19 @@ export function App() {
               <DiffView />
             </Suspense>
           )}
-          {!active && !diff && (
+          {!diff && pullFile && (
+            <Suspense fallback={<div className="loading">Loading patch…</div>}>
+              <PullFileView />
+            </Suspense>
+          )}
+          {dashboard && (
+            <Suspense
+              fallback={<div className="loading">Loading dashboard…</div>}
+            >
+              <Dashboard onNavigate={navigate} />
+            </Suspense>
+          )}
+          {!state.workspace && !patch && (
             <div className="welcome">
               <div className="welcome-inner">
                 <span className="eyebrow">
@@ -397,39 +446,7 @@ export function App() {
                     New project
                   </button>
                 </div>
-                {recent.length > 0 && (
-                  <div className="recent">
-                    <span className="field-legend">RECENT</span>
-                    {recent.map((entry) => (
-                      <div className="recent-row" key={entry.path}>
-                        <button
-                          title={entry.path}
-                          disabled={state.busy || projectBusy}
-                          onClick={() =>
-                            void projectActions.openRecent(entry.path)
-                          }
-                        >
-                          <span>{entry.name}</span>
-                          {entry.isProject && (
-                            <span className="recent-tag">
-                              {entry.stack || 'PROJECT'}
-                            </span>
-                          )}
-                          <span className="recent-path">{entry.path}</span>
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label={`Remove ${entry.name} from recent projects`}
-                          onClick={() =>
-                            projectActions.forgetRecent(entry.path)
-                          }
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <RecentProjects />
                 <div className="welcome-rule" />
                 <div className="shortcuts">
                   <div>

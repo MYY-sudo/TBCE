@@ -1,6 +1,6 @@
 # Architecture
 
-TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, and GitHub issues. Pull requests, the project dashboard and a database remain deferred.
+TBCE 0.1 implements the desktop foundation, the local editor, the integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, GitHub issues, a read-only GitHub pull request viewer, and the project dashboard. Creating, reviewing and merging pull requests, running project commands and a database remain deferred.
 
 ## Boundaries
 
@@ -47,6 +47,14 @@ GitHub panel
   → Tauri commands
   → Rust GitHubService → bounded HTTP runner
   → api.github.com
+```
+
+```text
+project dashboard
+  → dashboard store actions, and the project, git and github stores
+  → typed GitService and GitHubService adapters
+  → Tauri commands
+  → Rust GitService and GitHubService
 ```
 
 The Rust filesystem service owns the selected root and a generation identifier. The frontend receives a display path and identifier, then supplies relative paths for editor operations and snapshot capture. Replacing the workspace invalidates the previous identifier. Native pickers choose folders, files, and new-project parents. Reopening a recent project accepts an absolute path; the stack library uses a backend-owned application-data root, as described below.
@@ -302,7 +310,8 @@ runs only while the panel is on screen: when it appears, when the set of file
 revisions the editor holds changes, when the window regains focus, after a mutation,
 and on the explicit Refresh control. Saving is what that revision rule is for; opening
 a file changes the set too and refreshes as well, which is a harmless extra read rather
-than a separate trigger worth its own code. Closing the panel stops all of it. There is no file watcher and no
+than a separate trigger worth its own code. Closing the panel stops all of it, except
+that the Milestone 11 dashboard refreshes the same store while it is on screen. There is no file watcher and no
 poll, so a change made outside TBCE appears on the next focus or refresh.
 
 ### The diff preview
@@ -317,6 +326,12 @@ hidden rather than unmounted while it is open: unmounting runs Monaco's cleanup,
 disposes every model and would cost each tab its undo history. Closing the preview
 returns to exactly what was being edited.
 
+Since Milestone 10 the Monaco view itself is `components/PatchView.tsx`, shared with the
+patches of a pull request's changed files. `git/DiffView.tsx` is the Git wrapper around
+it, with its labels and banners unchanged. Only one patch occupies the editor area at a
+time: opening a pull request file closes the local diff, and the GitHub store watches
+the Git store so that opening a local diff closes the pull request patch.
+
 ### What the panel does not add
 
 Partial or hunk-level staging, commit amending, merge and rebase workflows, force
@@ -330,7 +345,7 @@ still asks for native confirmation in Rust rather than in the webview.
 GitHub panel
   → github store actions
   → typed GitHubService adapter
-  → fourteen github_* commands
+  → twenty github_* commands
   → Rust GitHubService → bounded HTTP runner
   → api.github.com
 ```
@@ -338,7 +353,9 @@ GitHub panel
 Milestone 8 reads a repository and never writes one. It answers a single question — what does
 GitHub know about the project that is open. Milestone 9 adds issues, and with them the only three
 requests TBCE sends that change anything on GitHub: creating, closing and reopening an issue, each
-on an explicit action. Pull requests and the dashboard stay with the milestones that own them.
+on an explicit action. Milestone 10 adds pull requests, and only reads them: every request it adds
+is a `GET`. Milestone 11 adds three reads for the project dashboard, described in its own
+section below.
 
 Three rules carry the security story, and they are the reason this shape was chosen over calling
 GitHub from the webview.
@@ -380,7 +397,10 @@ Unix seconds because formatting a local time is the interface's job.
 
 Answers are cached by request path with their `ETag` and revalidated with `If-None-Match`. A `304`
 reuses the cached body, including the paging flag, which the `Link` header no longer carries on a
-revalidated answer. The cache is small, in memory, and cleared wholesale on sign-in and sign-out; it
+revalidated answer. Since Milestone 11 the runner also keeps the page number of the `rel="last"`
+link, so a list read one item per page reports how many items there are; only the digits of its
+`page` parameter are read, and that number is cached and restored on a `304` like the paging flag.
+The cache is small, in memory, and cleared wholesale on sign-in and sign-out; it
 exists to spare the rate limit, not to be a store, which is why it is not a reason to introduce
 SQLite.
 
@@ -390,7 +410,8 @@ Failures are classified into a fixed set of codes, because `ServiceError` carrie
 `GITHUB_RESPONSE_INVALID`, `GITHUB_NOT_LINKED`, `GITHUB_TOKEN_REJECTED`,
 `CREDENTIALS_UNAVAILABLE` and `CREDENTIALS_UNSUPPORTED`, and since Milestone 9
 `GITHUB_WRITE_UNCONFIRMED`, `GITHUB_VALIDATION_FAILED` (a `422`), `GITHUB_GONE` (a `410`),
-`GITHUB_ISSUES_DISABLED`, `GITHUB_NOT_AN_ISSUE` and `GITHUB_INVALID_ISSUE`. GitHub's own `message` field is carried
+`GITHUB_ISSUES_DISABLED`, `GITHUB_NOT_AN_ISSUE` and `GITHUB_INVALID_ISSUE`, and since Milestone 10
+`GITHUB_INVALID_PULL`. GitHub's own `message` field is carried
 through where it explains something a user can act on — a SAML refusal, a suspended token — after
 being scrubbed.
 
@@ -463,22 +484,40 @@ Milestone 9 adds six more. The three that write are marked.
 | `github_close_issue`   | `workspaceId`, `number`, `reason` | **Writes.** The closed issue                          |
 | `github_reopen_issue`  | `workspaceId`, `number`           | **Writes.** The reopened issue                        |
 
+Milestone 10 adds three, none of which writes.
+
+| Command                | Arguments                       | Result                                                  |
+| ---------------------- | ------------------------------- | ------------------------------------------------------- |
+| `github_pull_requests` | `workspaceId`, `state`, `page`  | Page of pull requests, open or closed                   |
+| `github_pull_request`  | `workspaceId`, `number`         | One pull request with its body, counts and head checks  |
+| `github_pull_files`    | `workspaceId`, `number`, `page` | Page of changed files, each with GitHub's patch if sent |
+
+Milestone 11 adds three more for the dashboard, none of which writes.
+
+| Command              | Arguments     | Result                                                             |
+| -------------------- | ------------- | ------------------------------------------------------------------ |
+| `github_counts`      | `workspaceId` | Open pull requests and open issues counted apart                   |
+| `github_milestones`  | `workspaceId` | First page of open milestones with their open and closed counts    |
+| `github_head_checks` | `workspaceId` | Check runs and statuses of the local HEAD commit, or no commit yet |
+
 Counts are reported as GitHub reports them. `openIssuesAndPullRequests` is named after what the
 field actually contains: GitHub counts pull requests as issues, and a field called `openIssues`
 would be wrong in every repository with an open pull request.
 
 ### The panel
 
-One more activity-bar panel, mounted only while it is selected, so opening a folder or working in
-the editor never reads GitHub. It reads when the panel appears, when the window regains focus while
+One more activity-bar panel, mounted only while it is selected, so working in the editor never
+reads GitHub. Since Milestone 11 the dashboard also reads while it is on screen, which with a folder
+open and no file open it is; that section says what it reads. The panel reads when the panel appears, when the window regains focus while
 it is visible, and on its Refresh control. Nothing polls.
 
 One refresh reads everything the panel shows — repository, branches, commits, activity and the
-first page of issues — so switching between Overview, Branches, Commits and Issues runs nothing at
-all. Five requests against a 5000-per-hour allowance buys a panel that never waits when a tab is
-selected; a sixth re-reads an issue that is open on screen, so it cannot show a state older than the
-list beside it. Labels, assignees and milestones are read only when the filters or the new-issue
-form first need them.
+first pages of issues and pull requests — so switching between Overview, Branches, Commits, Issues
+and Pull requests runs nothing at all. Six requests against a 5000-per-hour allowance buys a panel
+that never waits when a tab is selected. An issue open on screen costs one more and a pull request
+four more — itself, its check runs, its commit statuses and its first page of files — so neither can
+show a state older than the list beside it. Labels, assignees and milestones are read only when the
+filters or the new-issue form first need them.
 
 The store keeps two busy flags rather than one. Reading a repository must not disable the account
 controls: a stalled or rate-limited read is exactly when someone wants to disconnect, and blocking
@@ -531,13 +570,97 @@ lives in the store, so a failed create or a switch to another panel loses no typ
 never reported as failed because the list could not be re-read afterwards: the issue exists, and the
 list says it could not refresh.
 
+### Pull requests
+
+Milestone 10 lives in `github/pulls.rs`, another child of the GitHub module on the same runner. It
+sends `GET` and nothing else, which a test asserts by recording every request the viewer makes.
+
+**What is read.** A list page carries each pull request's number, title, state, draft flag, author,
+source and target branch, labels, assignees, requested reviewers and teams, milestone and dates.
+GitHub reports a merged pull request as `closed`, so `merged` is derived from `merged_at` and the
+panel tells the two apart. The source names its repository when it differs from the target's, and a
+fork GitHub reports as `null` — a deleted fork — is shown as such rather than as a local branch. One
+pull request adds its body, commit and line counts, changed-file count, comment counts and GitHub's
+mergeable state, which stays unknown until GitHub has computed it in the background.
+
+**Checks.** Opening a pull request reads its head commit's check runs and its combined commit
+status, a hundred each, because CI services outside GitHub Actions still report through statuses.
+The head SHA comes from GitHub's answer, but it goes into a request path, so anything that is not 40
+or 64 hexadecimal digits is refused before a request exists. Each entry is classified as passing,
+failing, pending or neutral in Rust, and the summary is failing if anything failed, else pending if
+anything is still running, else passing if anything ran at all. A refusal of either source is part
+of the answer — `runsDenied` or `statusesDenied` — and any other failure becomes `checks.error`,
+because the pull request above it was read fine. A `404` or `422` on the check runs means GitHub
+does not have the commit; since Milestone 11 that sets `checks.missing` and skips the statuses read,
+which cannot exist either. Only a rejected token stops the read, so the
+account is still dropped exactly as elsewhere. More entries than were read is reported as
+`truncated`.
+
+**Files and patches.** Changed files are paged thirty at a time from GitHub's files endpoint, which
+lists at most 3,000. Each carries GitHub's unified patch, or nothing for a binary or very large file,
+and the panel opens that patch in the shared read-only Monaco view without another request. Pull
+request list pages and file pages read with the 8 MiB list cap that issue lists use; a single pull
+request and its checks keep 1 MiB, and the cache still keeps only answers within 1 MiB.
+
+**The panel.** The state is a Rust enum, open or closed, so no other value reaches the query. The
+description is plain text in a `pre` element, like an issue body. A token that cannot read pull
+requests leaves the tab explained and the rest of the panel intact; a failure to read files is shown
+beside the pull request rather than replacing it. Refresh re-reads an open pull request and its first
+page of files, and an open patch stays open only while that page still lists its file.
+
 ### What is deliberately absent
 
 No writes beyond creating, closing and reopening an issue: no editing, no comments, no locking, no
-pull request changes, no starring, no releases. No pull request lists, which belong to Milestone 10. No GitLab or Bitbucket. No OAuth device flow, no
+pull request creation, review or merge, no starring, no releases. No pull request comments or review
+threads, no side-by-side patches and no checkout of a pull request's branch. No GitLab or Bitbucket. No OAuth device flow, no
 GitHub Enterprise host, no avatar images, no SQLite cache, no background polling, and no code
 browsing — the Code tab the roadmap suggests would duplicate the explorer for a working copy the
 user already has on disk.
+
+## Project dashboard
+
+Milestone 11 is a view over services that already existed, plus three GitHub reads in
+`github/overview.rs`. It fills the editor area rather than a sidebar panel: an activity-bar button
+brings it in front of open files, and with a folder open and no file open it takes the place of the
+Welcome screen, which is now shown only when no folder is open. The editor is hidden rather than
+unmounted, as for a diff, so no tab loses its undo history. One thing occupies the editor area at a
+time: showing the dashboard closes a local diff or pull request patch, and activating a tab or
+opening a diff or patch puts that in front of it. The Recent list moved into a shared component so
+the dashboard can show it too; otherwise it would be unreachable once a folder is open.
+
+### What it reads
+
+Most cards read nothing of their own. Repository, stack, architecture and commands come from the
+project store; changes, upstream, branches and recent commits from the Git store, refreshed through
+its own action; repository metadata and activity from the GitHub store, also refreshed through its
+own action. The dashboard store holds only what nothing else read:
+
+- **Counts.** GitHub reports open issues and pull requests as one number. `counts` reads the
+  repository (normally a `304`) and then `pulls?state=open&per_page=1`, taking the number of open pull
+  requests from the `rel="last"` page, or from the page itself when there is no second one. Open
+  issues are the combined count minus that, never below zero, because GitHub updates the two
+  separately. Issues turned off report no issue count.
+- **Milestones.** The first thirty open milestones, soonest due first, with GitHub's own open and
+  closed counts, which include pull requests assigned to a milestone. The card says so, and says
+  when there are more than thirty.
+- **Build.** The check runs and statuses of the commit checked out locally, through the Milestone 10
+  checks reader. `github_head_checks` reads HEAD from the repository under the Git lock, releases it
+  and then asks GitHub, so the webview never names a commit. A branch with no commits sends nothing.
+  A commit GitHub does not have is reported as not pushed yet rather than as a failure.
+
+Each of the three can be refused or fail alone, as activity and issues can in the panel; only a
+rejected token stops the reads, and then the account is read again so the GitHub store signs out.
+Answers for a replaced folder are discarded by the same numbered-request rule the other stores use.
+
+### When it reads
+
+Only while it is on screen: when it appears, when the window regains focus while it is visible, and
+on its Refresh control. Local Git is read when the folder is a repository, and GitHub only when an
+account is connected and the remote is on github.com. A signed-out dashboard still reads the account
+once, as the GitHub panel does, because that is what says whether there is anyone to ask as.
+
+Project progress is a placeholder for Milestone 12, and commands are displayed, not run: running
+them belongs to Milestone 13 and must go through `ProcessService`.
 
 ## Editing and failure behavior
 

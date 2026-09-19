@@ -27,7 +27,7 @@ function StateIcon({ issue }: { issue: GitHubIssue }) {
     <CircleCheck size={13} />
   );
 }
-function Labels({ labels }: { labels: GitHubLabel[] }) {
+export function Labels({ labels }: { labels: GitHubLabel[] }) {
   if (!labels.length) return null;
   return (
     <span className="github-tags">

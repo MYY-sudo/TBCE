@@ -211,3 +211,160 @@ export const rateLabel = (rate: GitHubRateLimit | null): string =>
         rate.reset * 1000,
       ).toLocaleTimeString()}`
     : 'Rate limit not reported';
+export type GitHubPullState = 'open' | 'closed';
+export interface GitHubPullRequest {
+  number: number;
+  title: string;
+  state: GitHubPullState;
+  draft: boolean;
+  /// GitHub reports a merged pull request as closed, so this is what tells the two apart.
+  merged: boolean;
+  author: string | null;
+  head: {
+    reference: string;
+    /// `owner:branch`, as GitHub labels it.
+    label: string | null;
+    sha: string;
+    /// The repository the branch lives in, or null when that fork has been deleted.
+    repository: string | null;
+  };
+  base: { reference: string };
+  /// The branch lives in another repository than the one it targets, or in a deleted fork.
+  crossRepository: boolean;
+  labels: GitHubLabel[];
+  assignees: string[];
+  /// Requested reviewers: logins, then team names.
+  reviewers: string[];
+  milestone: { number: number; title: string } | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  closedAt: string | null;
+  mergedAt: string | null;
+}
+export type GitHubCheckOutcome = 'passing' | 'failing' | 'pending' | 'neutral';
+export interface GitHubCheck {
+  name: string;
+  /// A Checks API run, or a commit status reported the older way.
+  source: 'run' | 'status';
+  outcome: GitHubCheckOutcome;
+  /// GitHub's own word for where it stands.
+  state: string;
+  description: string | null;
+}
+/// The CI state of a pull request's head commit. A refusal or failure here is part of the answer,
+/// because the pull request itself was read fine.
+export interface GitHubChecks {
+  summary: 'passing' | 'failing' | 'pending' | 'none';
+  entries: GitHubCheck[];
+  truncated: boolean;
+  runsDenied: boolean;
+  statusesDenied: boolean;
+  /// GitHub does not have the commit, which for a local commit usually means it is not pushed.
+  missing: boolean;
+  error: string | null;
+}
+/// One pull request with its description, shown as written and never interpreted as markup.
+export interface GitHubPullRequestDetail extends GitHubPullRequest {
+  body: string | null;
+  commits: number | null;
+  additions: number | null;
+  deletions: number | null;
+  changedFiles: number | null;
+  comments: number | null;
+  reviewComments: number | null;
+  /// Null until GitHub has worked it out, which it does in the background.
+  mergeable: boolean | null;
+  mergeableState: string | null;
+  checks: GitHubChecks;
+  rate: GitHubRateLimit | null;
+}
+export interface GitHubPullFile {
+  path: string;
+  previousPath: string | null;
+  /// `added`, `removed`, `modified`, `renamed`, `copied`, `changed` or `unchanged`.
+  status: string;
+  additions: number;
+  deletions: number;
+  /// GitHub leaves the patch out for binary files and for very large ones.
+  patch: string | null;
+}
+/// GitHub lists at most this many changed files for one pull request.
+export const PULL_FILES_MAX = 3000;
+/// How a pull request's state reads. Merged and draft are told apart from plain closed and open.
+export const pullStateLabel = (pull: GitHubPullRequest): string =>
+  pull.merged
+    ? 'Merged'
+    : pull.state === 'closed'
+      ? 'Closed'
+      : pull.draft
+        ? 'Draft'
+        : 'Open';
+/// Where a pull request's branch comes from, naming the fork when it is not this repository.
+export const sourceLabel = (pull: GitHubPullRequest): string =>
+  !pull.crossRepository
+    ? pull.head.reference
+    : pull.head.repository
+      ? `${pull.head.repository}:${pull.head.reference}`
+      : `${pull.head.reference} (deleted fork)`;
+/// The CI state as a sentence.
+export const checksLabel = (checks: GitHubChecks): string => {
+  const count = checks.entries.length;
+  const failing = checks.entries.filter((c) => c.outcome === 'failing').length;
+  const pending = checks.entries.filter((c) => c.outcome === 'pending').length;
+  switch (checks.summary) {
+    case 'failing':
+      return `${failing} of ${count} checks failing`;
+    case 'pending':
+      return `${pending} of ${count} checks pending`;
+    case 'passing': {
+      const neutral = checks.entries.filter(
+        (c) => c.outcome === 'neutral',
+      ).length;
+      return neutral
+        ? `${count - neutral} passed, ${neutral} skipped or neutral`
+        : `All ${count} checks passed`;
+    }
+    default:
+      return 'No checks reported';
+  }
+};
+/// Whether GitHub thinks the branch merges cleanly, including when it has not decided yet.
+export const mergeableLabel = (detail: GitHubPullRequestDetail): string => {
+  if (detail.merged || detail.state === 'closed') return '—';
+  if (detail.mergeable === null) return 'Not yet known';
+  if (!detail.mergeable) return 'Has conflicts';
+  return detail.mergeableState === 'blocked'
+    ? 'Blocked by branch rules'
+    : detail.mergeableState === 'behind'
+      ? 'Behind the target branch'
+      : 'No conflicts';
+};
+/// Open issues and pull requests counted apart, for the dashboard.
+export interface GitHubCounts {
+  openPullRequests: number;
+  /// Null when issues are turned off or GitHub did not report its combined count.
+  openIssues: number | null;
+  issuesDisabled: boolean;
+  rate: GitHubRateLimit | null;
+}
+/// An open milestone. GitHub's counts include pull requests assigned to it, not only issues.
+export interface GitHubMilestone {
+  number: number;
+  title: string;
+  dueOn: string | null;
+  openIssues: number;
+  closedIssues: number;
+}
+/// The CI state of the commit checked out locally. `oid` is null on a branch with no commits.
+export interface GitHubHeadChecks {
+  oid: string | null;
+  checks: GitHubChecks | null;
+  rate: GitHubRateLimit | null;
+}
+/// How much of a milestone is closed, from 0 to 1, or null when nothing is assigned to it.
+export const milestoneProgress = (
+  milestone: GitHubMilestone,
+): number | null => {
+  const total = milestone.openIssues + milestone.closedIssues;
+  return total ? milestone.closedIssues / total : null;
+};

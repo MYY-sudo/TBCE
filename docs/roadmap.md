@@ -613,6 +613,19 @@ with the generic TBCE types.
 
 #### Milestone 10 — Pull request viewer
 
+Execution tracking: [Milestone 10 checklist](milestone-10.md).
+
+**Delivered September 18, 2026** as a Pull requests tab in the GitHub panel over three more
+`github_*` commands, all of which only read. The user chose three scope decisions before
+implementation: changed files are listed with their counts, and choosing one opens the patch
+GitHub sent with the list in the editor area, read-only like the local diff, with no further
+request; CI state combines Checks API runs with commit statuses, because CI services outside
+GitHub Actions still report through statuses; and the list filters by open or closed only,
+with merged pull requests told apart from ones closed without merging. Under the same waiver as
+Milestones 4 to 9 this milestone is covered by automated tests but is **not desktop-accepted**:
+installed-app checks 83-90 wait in the [manual run-sheet](acceptance-runsheet-m6.md). See the
+[verification record](verification.md).
+
 Implement:
 
 - List PRs
@@ -631,9 +644,28 @@ Later:
 
 Do not rebuild the entire GitHub interface. Focus on useful repository context.
 
+Every item in the first list shipped, and nothing in the second: TBCE sends no request that
+creates, reviews or merges a pull request, and the three new commands are `GET` only. Comments
+and review threads are not shown; the view reports their count. With this milestone the
+Suggested tabs from Milestone 8 are all present except Code, which stays out for the reason given
+there. GitHub models live in `github/pulls.rs` and `types/github.ts` and are not shared with the
+generic TBCE types.
+
 ### Phase 12 — Project dashboard
 
 #### Milestone 11 — Project overview
+
+Execution tracking: [Milestone 11 checklist](milestone-11.md).
+
+**Delivered September 19, 2026** as a dashboard in the editor area over the existing project, Git and
+GitHub stores, plus three more `github_*` commands, all of which only read. The user chose four scope
+decisions before implementation. The dashboard fills the editor area and replaces the Welcome screen
+once a folder is open. Issue and pull request counts are exact, for one extra request. Build is the
+CI state of the commit checked out locally. Milestones are GitHub's open milestones, with project
+progress left to Milestone 12. Commands are shown, not run, until Milestone 13. Under the same waiver
+as Milestones 4 to 10 this milestone is covered by automated tests but is **not desktop-accepted**:
+installed-app checks 91-98 wait in the [manual run-sheet](acceptance-runsheet-m6.md). See the
+[verification record](verification.md).
 
 This should become one of TBCE's core features. Example:
 
@@ -674,6 +706,11 @@ Dashboard sections:
 - Milestones
 - Project progress
 - Recent activity
+
+Every section is present. Two are deliberately partial, and each says so on screen. Commands lists
+what the manifest records and runs nothing, because running them is Milestone 13. Project progress
+is a placeholder, because Milestone 12 owns it and the roadmap rules out counting commits. Milestones
+are GitHub's own, with GitHub's closed and open counts, which include pull requests.
 
 ### Phase 13 — Progress tracking
 
