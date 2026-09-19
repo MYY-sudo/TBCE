@@ -4,6 +4,7 @@ mod filesystem;
 mod git;
 mod github;
 mod process;
+mod progress;
 mod project;
 mod templates;
 mod terminal;
@@ -62,6 +63,7 @@ pub fn run() {
             commands::github_counts,
             commands::github_milestones,
             commands::github_head_checks,
+            commands::github_area_issues,
             commands::github_create_issue,
             commands::github_close_issue,
             commands::github_reopen_issue,
@@ -88,6 +90,8 @@ pub fn run() {
             commands::init_project,
             commands::update_project,
             commands::open_recent_project,
+            commands::read_progress,
+            commands::write_progress,
             commands::start_terminal,
             commands::write_terminal,
             commands::resize_terminal,

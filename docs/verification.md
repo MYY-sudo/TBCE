@@ -1260,6 +1260,179 @@ this session.
 - **Platform and release:** operating systems other than Windows, installer upgrade and uninstall,
   signing, and release ownership.
 
+## Milestone 12 — Project progress, September 19, 2026
+
+Project progress is implemented and covered by automated tests against a mock GitHub API, temporary
+folders and mocked services. **This is not desktop acceptance.** No installed-app scenario ran in
+this session and no real GitHub request was made. Milestone 6 gate items P10, P11 and P12 remain
+open, and the new checks 99-106 are added to the [manual run-sheet](acceptance-runsheet-m6.md)
+unexecuted.
+
+### Scope decisions
+
+The user chose four before implementation; the rest were stated in the approved plan. All are
+recorded in the [delivery checklist](milestone-12.md).
+
+1. **Storage** in `.tbce/progress.json`, a file of its own, with `project.json` left at schema 1.
+2. **Mapping** by one GitHub label, one GitHub milestone, or both, each issue counted once.
+3. **Counting** exact: mapped issues read in every state, pull requests left out, at most five pages
+   of a hundred per label or milestone.
+4. **Editing** on the dashboard card, with an Edit areas dialog for the structure.
+5. **Plan-stated:** a project is required; two levels only; closed as not planned left out; no
+   percentage for nothing to measure; tasks alone when issues cannot be read; commands still not
+   run; desktop acceptance under the Milestone 4-11 waiver.
+
+### Desktop acceptance waiver
+
+This is unchanged in substance from [Milestone 8](#desktop-acceptance-waiver-and-what-changed-about-it).
+Desktop automation works and check 1 has a recorded pass, so what is outstanding is unexecuted
+checks rather than a missing tool. With this milestone's eight there are now 77. Checks 99-106 write
+only to a disposable clone's `.tbce/progress.json` and read from GitHub. They reuse the repository
+and clone prepared for 91-98, with a label, labelled issues and a milestone added by hand.
+
+### Automated verification
+
+Every command below exited 0. The raw output is in
+[automated checks](evidence/m12-progress/automated-checks.log).
+
+| Check                                       | Before | After | Result |
+| ------------------------------------------- | ------ | ----- | ------ |
+| `npm run format:check`                      | —      | —     | Pass   |
+| `npm run lint`                              | —      | —     | Pass   |
+| `npx tsc -b`                                | —      | —     | Pass   |
+| `npm test`                                  | 250    | 278   | Pass   |
+| `cargo fmt --check`                         | —      | —     | Pass   |
+| `cargo clippy --all-targets -- -D warnings` | —      | —     | Pass   |
+| `cargo test --locked`                       | 158    | 178   | Pass   |
+
+- **New tests:** twenty Rust and twenty-eight frontend.
+- **Changed tests:** in the dashboard view, the assertion that the placeholder names Milestone 12
+  became assertions on the real card's figures, and the signed-out test also checks that mapped
+  areas count their tasks alone and ask GitHub nothing. The dashboard tests mock the new progress
+  adapter and area read, so the card reads nothing real.
+- **Environment:** Git 2.54.0.windows.1, Node 24.15.0, npm 11.12.1, Cargo 1.96.0, Windows.
+- **Source manifest:** the [source manifest](evidence/m12-progress/source-manifest.txt)
+  fingerprints the tested tracked and untracked sources, excluding `docs/` and `README.md`. It has
+  125 entries, up from 116. The nine new ones are:
+  - `src-tauri/src/github/progress.rs`
+  - `src-tauri/src/progress/mod.rs`
+  - `src/dashboard/ProgressCard.tsx`
+  - `src/dashboard/ProgressDialog.tsx`
+  - `src/services/progress.ts`
+  - `src/stores/progress.ts`
+  - `src/types/progress.ts`
+  - `tests/progress-view.test.tsx`
+  - `tests/progress.test.ts`
+- **Manifest SHA-256:** `A2B1CAB28D2980419A7DBDC877B84F2455F47578403F28A792B77D34294C1A06`.
+
+No dependency was added on either side. `tempfile` and `sha2` were already dependencies, and the
+icons come from the installed `lucide-react`.
+
+### What the new tests actually assert
+
+The Rust progress tests write into temporary folders.
+
+- **Round trip:** a plan is written and read back equal, with the same revision, `schemaVersion` 1,
+  the label and a ticked task on disk as JSON. The manifest's bytes are identical before and after.
+- **Refusals:** a folder with no manifest is refused and gets no `.tbce` folder. A second writer that
+  never read the file is refused, a writer holding an older revision is refused after a newer save,
+  and the file keeps the newer plan.
+- **Unusable files:** invalid JSON, schema version 2 and two areas named `A` and `a` each read as
+  invalid, a write over each is refused, and each file keeps its exact contents.
+- **Limits:** fourteen plans, one per limit, are each refused with `INVALID_PROGRESS`, and no file is
+  written. Names, titles and labels are trimmed, a blank label dropped, and Turkish text survives.
+- **Disk:** no temporary file is left beside the plan, and a `.tbce` junction to another folder is
+  refused for reads and writes, with nothing written there.
+
+The area issue tests use the mock GitHub API in `github/mock.rs`.
+
+- **Paths:** a label is read with `state=all`, percent-encoded (`area%3Aauth`), a hundred a page,
+  and paging follows the `Link` header. A label and a milestone are read separately, neither query
+  naming the other, and the issue found by both is kept once. `x&state=open#` stays inside its
+  parameter.
+- **Content:** pull requests are dropped on every page; `not_planned` is marked only for a closed
+  issue; issues come back newest first.
+- **Limits:** six advertised pages stop after five requests with `truncated` set. No mapping, or a
+  blank label, sends nothing; a comma, a tab, fifty-one characters and milestone 0 are refused before
+  any request.
+- **Failures:** `410` reads as issues turned off, and `401` drops the token.
+- **Nothing writes:** three requests, each a `GET` with no body.
+
+The frontend tests use the mocked-adapter pattern of earlier milestones. The notable ones:
+
+- **Figures:** tasks and closed issues over tasks and issues; closed as not planned in neither; no
+  percentage for nothing to measure; tasks alone, flagged, when a mapped area's issues are missing;
+  an issue shared by two areas counted once in the project.
+- **The dialog's checks** match the backend's: blank and duplicate names regardless of case, a comma
+  or a fifty-one-character label, milestone 0, a blank task and a control character.
+- **The progress store:** a first save names no revision and the next names the one returned;
+  ticking a task changes only that task; `CONFLICT` reloads the plan on disk and keeps it with an
+  explanation; an unusable file is never sent; an answer for a replaced folder is discarded.
+- **The dashboard store:** two areas sharing a label cause one read and an unmapped area none;
+  signed out nothing is read; a `403` stays with its area while the next is still read; a `401`
+  stops the rest and signs out; a stale answer is discarded; Refresh reads the plan and then its
+  areas.
+- **The card and dialog:**
+  - A plain folder is offered conversion and nothing is read.
+  - An unusable file is explained and Edit areas is not offered.
+  - Names and titles containing `<b>` and `<img … onerror>` render as text, with no such elements.
+  - Ticking a task saves at once with the revision read, and the bar follows.
+  - Adding, renaming, reordering, removing and labelling in the dialog produce one save of exactly
+    that plan, trimmed.
+  - Duplicate names and a comma are explained and Save stays disabled with nothing sent.
+  - Signed out, a mapped area reads "1 of 2 tasks · issues not counted: connect a GitHub account".
+- **The whole dashboard:** with a label and a milestone mapped and one issue closed as not planned,
+  Authentication reads 50%, the project 40%, "2 of 5 done", and GitHub is asked once.
+
+### Production bundle
+
+The development-only harness is still excluded, and the GitHub host and any write method still
+appear nowhere in the bundle. No source file uses `dangerouslySetInnerHTML` or `innerHTML`. The card
+and dialog ship in the dashboard's lazy chunk. The content security policy was not touched. See the
+[bundle inspection](evidence/m12-progress/production-bundle-exclusion.txt).
+
+### Deliberate negative checks
+
+Three tests were proven to fail when the thing they protect is removed. Each file was then restored:
+
+- Removing `allow-write-progress` from `capabilities/main.json` makes the registration test report
+  `write_progress is missing from the main window capability`.
+- Weakening the revision check in `progress/mod.rs` so that it refuses only a writer that never read
+  the file makes `a_write_against_a_changed_file_is_refused` fail: a stale revision was accepted.
+- Counting issues closed as not planned in `types/progress.ts` makes `an issue closed as not planned
+is left out rather than counted as done` fail, and with it the whole-dashboard test, whose figures
+  change.
+
+All three files were restored from copies. Their SHA-256 hashes were checked against the copies
+taken beforehand, and the whole tree was checked against the source manifest afterwards.
+
+### Packaging
+
+`npm run tauri build` exited 0; the standard release target was free this time, so no `--target`
+was needed. It produced the installer `src-tauri/target/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`,
+with SHA-256 `AC74CD6FFE956F0744C33C420459D9E42C9289F4AFA8CD8A67578CC0370CF8AD`, and the executable
+`src-tauri/target/release/tbce.exe`, with SHA-256
+`8A95E3D24F7640A7C3329AE4AF49BE89D634892FF26DAAC581A9002E9073EF5A`. The build ran on the source the
+manifest records, before the negative checks, which then restored every file byte for byte. The
+[package log](evidence/m12-progress/windows-package.log) holds the output. It was **not** installed
+or exercised in this session.
+
+### Not verified
+
+- **Installed-app behaviour** of anything in this milestone. The card and dialog have not been
+  rendered in WebView2, and no `progress.json` has been written by the packaged application.
+- **Any real GitHub request.** None of the following has been exercised against the live service:
+  `state=all` with a label or a milestone; `state_reason` on real closed issues; paging a label with
+  more than a hundred issues; a page of a hundred issues with long bodies against the page cap.
+- **Acceptance checks** 99-106, and the still-open 15-42, 57-66, 67-74, 75-82, 83-90 and 91-98.
+- **Layout** at 1280 × 820 and at the minimum 800 × 540 window size, including the dialog's
+  scrolling and single-column fields.
+- **Concurrent writers** beyond the revision check. Two TBCE windows on one project, or a Git
+  checkout that replaces `progress.json` between the check and the move, are not tested; the move is
+  not atomic with the check.
+- **Platform and release:** operating systems other than Windows, installer upgrade and uninstall,
+  signing, and release ownership.
+
 ## Build notes
 
 Vite reports a large lazy Monaco chunk, expected for the bundled editor and language support. Tauri warns that the requested `com.tbce.app` identifier ends in `.app`; it is retained as specified, with macOS packaging deferred. Initial sandbox path-access errors were resolved by running build tools with the required filesystem access.

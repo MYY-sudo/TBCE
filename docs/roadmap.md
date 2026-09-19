@@ -707,14 +707,26 @@ Dashboard sections:
 - Project progress
 - Recent activity
 
-Every section is present. Two are deliberately partial, and each says so on screen. Commands lists
-what the manifest records and runs nothing, because running them is Milestone 13. Project progress
-is a placeholder, because Milestone 12 owns it and the roadmap rules out counting commits. Milestones
+Every section is present. When Milestone 11 was delivered two were deliberately partial, and each
+said so on screen. Commands still lists what the manifest records and runs nothing, because running
+them is Milestone 13. Project progress was a placeholder until Milestone 12 replaced it. Milestones
 are GitHub's own, with GitHub's closed and open counts, which include pull requests.
 
 ### Phase 13 — Progress tracking
 
 #### Milestone 12 — Project progress
+
+Execution tracking: [Milestone 12 checklist](milestone-12.md).
+
+**Delivered September 19, 2026** as the Project progress card on the dashboard, over a new
+`.tbce/progress.json` beside the manifest and one more read-only `github_*` command. The user chose
+four scope decisions before implementation. Progress lives in a file of its own, so `project.json`
+stays at schema version 1. An area takes a GitHub label, a GitHub milestone or both, and its issues
+are counted exactly, one by one, with pull requests left out. Tasks are ticked on the card, and an
+Edit areas dialog changes the structure. Commits are never counted. Under the same waiver as
+Milestones 4 to 11 this milestone is covered by automated tests but is **not desktop-accepted**:
+installed-app checks 99-106 wait in the [manual run-sheet](acceptance-runsheet-m6.md). See the
+[verification record](verification.md).
 
 **Goal:** Show meaningful progress.
 
@@ -751,6 +763,12 @@ Project
 ```
 
 Allow issues to map into these areas.
+
+Areas and their explicit tasks are the project's own, kept in `.tbce/progress.json`. Issues map in
+through an area's label or milestone. Milestones serve as a source of issues rather than as a count,
+because GitHub's milestone counts include pull requests. Completed work items are ticked tasks and
+closed issues; an issue closed as not planned is left out rather than counted as done. The tree has
+two levels, as in the example.
 
 ### Phase 14 — Project commands
 

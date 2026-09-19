@@ -76,6 +76,8 @@ Commands return serializable values or `{ code, message }` errors. The service a
 | `detect_project`            | `workspaceId`                                                                     | None, found manifest, or invalid reason                                                |
 | `init_project`              | `workspaceId`, `fields`                                                           | Project                                                                                |
 | `update_project`            | `workspaceId`, `fields`                                                           | Project                                                                                |
+| `read_progress`             | `workspaceId`                                                                     | None, found plan with its revision, or invalid reason                                  |
+| `write_progress`            | `workspaceId`, `plan`, `revision` or null                                         | Saved plan and its new revision                                                        |
 | `list_stacks`               | None                                                                              | Stacks and warnings for damaged definitions                                            |
 | `inspect_stack_source`      | `workspaceId`, relative directory `path`                                          | File/directory selections with size, revision, exclusion defaults, and blocked reasons |
 | `save_stack`                | `workspaceId`, optional existing `id`, `fields`, selected `entries`               | Stack or null after cancelled replacement confirmation                                 |
@@ -93,7 +95,7 @@ Terminal output and exit codes arrive on the `terminal:event` channel as `{ kind
 
 ## Project behavior
 
-`ProjectService` is stateless: commands resolve the open workspace root through `FileSystemService`, then read or write `.tbce/project.json` beneath it. Detection reports one of three outcomes — no manifest, a manifest, or a manifest TBCE could not read — so a corrupt or future-schema file degrades to an explanation instead of an error. Project settings replace the stored fields rather than merging them. Stack settings suggest the saved catalog and preserve unknown legacy strings. Architecture settings offer the personal catalog and preserve unavailable legacy strings as metadata. `commands` is stored and edited but never executed, because running commands belongs to the command milestone and must reuse `ProcessService`. The project service makes no claim about Git at all: it still runs no Git command, so opening a folder never waits on one, and repository state comes from a separate `GitService` call instead.
+`ProjectService` is stateless: commands resolve the open workspace root through `FileSystemService`, then read or write `.tbce/project.json` beneath it. Detection reports one of three outcomes — no manifest, a manifest, or a manifest TBCE could not read — so a corrupt or future-schema file degrades to an explanation instead of an error. Project settings replace the stored fields rather than merging them, which is why progress is kept in a file of its own rather than in the manifest. Stack settings suggest the saved catalog and preserve unknown legacy strings. Architecture settings offer the personal catalog and preserve unavailable legacy strings as metadata. `commands` is stored and edited but never executed, because running commands belongs to the command milestone and must reuse `ProcessService`. The project service makes no claim about Git at all: it still runs no Git command, so opening a folder never waits on one, and repository state comes from a separate `GitService` call instead.
 
 The frontend keeps recent projects in webview local storage, capped and deduplicated by path. Losing that list costs a convenience, never project data, so no database is introduced for it.
 
@@ -345,7 +347,7 @@ still asks for native confirmation in Rust rather than in the webview.
 GitHub panel
   → github store actions
   → typed GitHubService adapter
-  → twenty github_* commands
+  → twenty-one github_* commands
   → Rust GitHubService → bounded HTTP runner
   → api.github.com
 ```
@@ -354,8 +356,8 @@ Milestone 8 reads a repository and never writes one. It answers a single questio
 GitHub know about the project that is open. Milestone 9 adds issues, and with them the only three
 requests TBCE sends that change anything on GitHub: creating, closing and reopening an issue, each
 on an explicit action. Milestone 10 adds pull requests, and only reads them: every request it adds
-is a `GET`. Milestone 11 adds three reads for the project dashboard, described in its own
-section below.
+is a `GET`. Milestone 11 adds three reads for the project dashboard, and Milestone 12 one for the
+issues of a progress area, each described in its own section below.
 
 Three rules carry the security story, and they are the reason this shape was chosen over calling
 GitHub from the webview.
@@ -499,6 +501,12 @@ Milestone 11 adds three more for the dashboard, none of which writes.
 | `github_counts`      | `workspaceId` | Open pull requests and open issues counted apart                   |
 | `github_milestones`  | `workspaceId` | First page of open milestones with their open and closed counts    |
 | `github_head_checks` | `workspaceId` | Check runs and statuses of the local HEAD commit, or no commit yet |
+
+Milestone 12 adds one more for project progress, which does not write either.
+
+| Command              | Arguments                                           | Result                                                            |
+| -------------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
+| `github_area_issues` | `workspaceId`, `label` or null, `milestone` or null | Issues with the label or in the milestone, pull requests left out |
 
 Counts are reported as GitHub reports them. `openIssuesAndPullRequests` is named after what the
 field actually contains: GitHub counts pull requests as issues, and a field called `openIssues`
@@ -659,8 +667,73 @@ on its Refresh control. Local Git is read when the folder is a repository, and G
 account is connected and the remote is on github.com. A signed-out dashboard still reads the account
 once, as the GitHub panel does, because that is what says whether there is anyone to ask as.
 
-Project progress is a placeholder for Milestone 12, and commands are displayed, not run: running
-them belongs to Milestone 13 and must go through `ProcessService`.
+Commands are displayed, not run: running them belongs to Milestone 13 and must go through
+`ProcessService`. The Project progress card is described in its own section below.
+
+## Project progress
+
+```text
+Project progress card / Edit areas dialog
+  → progress store (plan, revision)      → typed progress adapter → read_progress / write_progress
+  → dashboard store (issues per mapping) → typed GitHub adapter   → github_area_issues
+  → Rust ProgressService, GitHubService
+```
+
+Milestone 12 divides a project into areas, each with explicit tasks and optionally a GitHub label
+and a GitHub milestone. Commits are never counted: the roadmap rules them out, and nothing in the
+progress code reads Git history.
+
+### The plan on disk
+
+`ProgressService` is stateless, like `ProjectService`, and keeps the plan in `.tbce/progress.json`
+beside the manifest: `schemaVersion` 1 and a list of areas, each with an identifier, a name, an
+optional label, an optional milestone number and its tasks, each with an identifier, a title and
+whether it is done. It is a file of its own because a settings save rebuilds `project.json` from the
+fields it knows, and because a manifest at schema version 2 would read as invalid in every earlier
+build. The file sits in the project, so it travels through Git with the code it describes; it holds
+no secret.
+
+A read reports no plan, a plan with its revision, or why the file cannot be used. The limits are
+checked on every read as well as every write, so a hand-edited file breaking one is reported rather
+than shown half-valid. A write carries the revision the interface read, the SHA-256 of the file's
+bytes, or null when there was no file; a different revision on disk is refused with `CONFLICT`, and
+an unusable file has no revision to name, so TBCE never writes over one. The new file is written
+beside the old one, synced and moved over it, the pattern architecture definitions already use. The
+check and the move are not one atomic step, which is the existing local-process race limitation
+rather than a new one. Writing requires `.tbce/project.json`, and both paths go through
+`metadata_path`, so links and junctions are refused as they are for the manifest.
+
+### Issues in an area
+
+`github_area_issues` receives a label and a milestone number from the plan the webview holds. The
+label is checked (at most 50 characters, no control characters, no comma, which GitHub would read
+as two labels) and percent-encoded; the milestone must be a positive number; the repository still
+comes from the Git remote. Each is read on its own, because GitHub combines filters with "and" and
+an area wants either: `issues?state=all&labels=…` and `issues?state=all&milestone=N`, a hundred a
+page and at most five pages each, with pull requests dropped and each issue kept once. A page of a
+hundred issues can carry a hundred bodies, so the page cap is sized for that; bodies are read and
+not kept. Neither GitHub's milestone counts nor a `rel="last"` count is used, because both include
+pull requests.
+
+The dashboard store reads each distinct mapping once, one at a time, however many areas share it.
+Each read can be refused or fail alone, a rejected token stops the rest and signs the GitHub store
+out, and a newer read, or a replaced folder, discards an older one. The card asks for a read when
+the set of mappings changes, so ticking a task asks GitHub nothing; Refresh and window focus read
+the plan again and then its issues.
+
+### The figures
+
+An area's figure is its done tasks plus its closed issues over its tasks plus its issues. An issue
+closed as not planned counts in neither and is reported separately. An area with nothing to measure
+has no percentage. The project's figure sums the areas' tasks and counts each issue once, even when
+two areas find it. An area whose issues could not be read — signed out, no GitHub remote, a refused
+or failed read — counts its tasks alone and says why; the project figure then says so too.
+
+### What is deliberately absent
+
+Nested areas, weights, due dates, assignees on tasks, history of progress over time, and issues
+linked by number. More than five hundred issues and pull requests per label or milestone are not
+read. A task is not a GitHub issue and is never sent to GitHub.
 
 ## Editing and failure behavior
 
@@ -675,7 +748,7 @@ them belongs to Milestone 13 and must go through `ProcessService`.
 
 Only the local main window receives the explicitly enumerated application commands and event/close permissions. No shell plugin and no generic filesystem plugin permission is exposed. Monaco workers, fonts, and application assets are bundled locally, and the content security policy still allows no remote origin at all: `connect-src` is IPC-only and `img-src` is `'self' data:`, so the webview cannot reach the network even now that the application can.
 
-Two of these sentences changed in Milestone 8 and the change is worth stating plainly. TBCE now makes network requests and now stores a credential. Both are confined to Rust: requests are built by `GitHubService` from a workspace identifier and a page number, so the webview cannot name a host, a path, a header or a URL; and the token is kept in the Windows Credential Manager, written only after GitHub accepts it, read per operation, never returned by any command, and scrubbed out of every message. Nothing writes a secret into the repository or into application data, because `.tbce/project.json` lives inside the user's own repository and application data is unencrypted JSON.
+Two of these sentences changed in Milestone 8 and the change is worth stating plainly. TBCE now makes network requests and now stores a credential. Both are confined to Rust: requests are built by `GitHubService` from a workspace identifier, a page number and values it checks first, such as an issue number or a label, so the webview cannot name a host, a path, a header or a URL; and the token is kept in the Windows Credential Manager, written only after GitHub accepts it, read per operation, never returned by any command, and scrubbed out of every message. Nothing writes a secret into the repository or into application data, because `.tbce/project.json` and `.tbce/progress.json` live inside the user's own repository and application data is unencrypted JSON.
 
 Reopening a recent project is the one command that accepts an absolute path from the webview instead of a native picker. The path can only come from a folder this application already opened, and opening it still canonicalizes and checks the path exactly as the picker path does. Editor operations and snapshot source reads stay confined to the open workspace. Stack operations resolve opaque IDs beneath a backend-owned application-data directory. New-project writes use a native-picked parent; the webview cannot supply a destination path.
 

@@ -610,7 +610,7 @@ fn milestone_number(value: &str) -> Result<u64> {
         .ok_or_else(|| refused("That milestone cannot be used."))
 }
 
-fn validate_label(label: &str) -> Result<()> {
+pub(super) fn validate_label(label: &str) -> Result<()> {
     if label.is_empty() || label.chars().count() > LABEL_MAX || label.chars().any(char::is_control)
     {
         return Err(refused(&format!("The label \"{label}\" cannot be used.")));

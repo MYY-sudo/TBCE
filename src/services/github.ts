@@ -2,6 +2,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import type {
   GitHubAccount,
   GitHubActivity,
+  GitHubAreaIssues,
   GitHubBranch,
   GitHubCloseReason,
   GitHubCommit,
@@ -102,4 +103,15 @@ export const github = {
     call<GitHubPage<GitHubMilestone>>('github_milestones', { workspaceId }),
   headChecks: (workspaceId: string) =>
     call<GitHubHeadChecks>('github_head_checks', { workspaceId }),
+  /// The issues of one progress area. The backend checks the label and milestone before sending.
+  areaIssues: (
+    workspaceId: string,
+    label: string | null,
+    milestone: number | null,
+  ) =>
+    call<GitHubAreaIssues>('github_area_issues', {
+      workspaceId,
+      label,
+      milestone,
+    }),
 };

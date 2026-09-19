@@ -3,7 +3,10 @@ import { github } from '../services/github';
 import { useWorkspace } from './workspace';
 import { actions as gitActions, useGit } from './git';
 import { actions as githubActions, useGitHub } from './github';
+import { actions as progressActions, useProgress } from './progress';
+import { mappingKey } from '../types/progress';
 import type {
+  GitHubAreaIssues,
   GitHubCounts,
   GitHubHeadChecks,
   GitHubMilestone,
@@ -21,7 +24,16 @@ interface DashboardState {
   milestonesError: string | null;
   head: GitHubHeadChecks | null;
   headError: string | null;
+  /// The issues of each progress area, by mapping, so areas with the same label and milestone
+  /// share one read.
+  areas: Record<string, AreaRead>;
+  areasBusy: boolean;
   busy: boolean;
+}
+export interface AreaRead {
+  value: GitHubAreaIssues | null;
+  denied: boolean;
+  error: string | null;
 }
 /// What the dashboard reads from GitHub itself. Repository, activity, issues and pull requests
 /// belong to the GitHub store, which the dashboard asks to refresh rather than duplicating.
@@ -35,14 +47,22 @@ const remote = {
   milestonesError: null as string | null,
   head: null as GitHubHeadChecks | null,
   headError: null as string | null,
+  areas: {} as Record<string, AreaRead>,
 };
-const initial: DashboardState = { open: false, ...remote, busy: false };
+const initial: DashboardState = {
+  open: false,
+  ...remote,
+  areasBusy: false,
+  busy: false,
+};
 export const useDashboard = create<DashboardState>(() => ({ ...initial }));
 const set = useDashboard.setState;
 const get = useDashboard.getState;
 // Like the GitHub store, each read is numbered so a late answer for a replaced workspace is
 // discarded, and a read started while one runs is refused rather than queued.
 let request = 0;
+// Area reads have their own sequence: they follow the plan, which changes on its own.
+let areaRequest = 0;
 const isCurrent = (id: string | undefined) =>
   useWorkspace.getState().workspace?.id === id;
 const failed = (error: unknown) =>
@@ -111,11 +131,56 @@ export const actions = {
       if (current === request) set({ busy: false });
     }
   },
-  /// Everything the dashboard shows: local Git, the GitHub store, then its own reads.
+  /// The issues of every mapped area in the progress plan, one mapping at a time. A newer call
+  /// replaces an older one, because the plan it was reading for may have changed.
+  refreshAreas: async (): Promise<boolean> => {
+    const id = useWorkspace.getState().workspace?.id;
+    const current = ++areaRequest;
+    const detection = useProgress.getState().detection;
+    if (!id || !connected() || detection.status !== 'found') {
+      set({ areas: {}, areasBusy: false });
+      return false;
+    }
+    const mappings = new Map<
+      string,
+      { label: string | null; milestone: number | null }
+    >();
+    for (const area of detection.plan.areas) {
+      const key = mappingKey(area);
+      if (key)
+        mappings.set(key, {
+          label: area.label?.trim() || null,
+          milestone: area.milestone,
+        });
+    }
+    const live = () => current === areaRequest && isCurrent(id);
+    set({ areasBusy: mappings.size > 0 });
+    const areas: Record<string, AreaRead> = {};
+    try {
+      for (const [key, { label, milestone }] of mappings) {
+        areas[key] = await section(() =>
+          github.areaIssues(id, label, milestone),
+        );
+        if (!live()) return false;
+      }
+      set({ areas });
+      return true;
+    } catch (error) {
+      if (!live()) return false;
+      set({ areas: {} });
+      if (authenticationFailed(error)) void githubActions.loadAccount();
+      return false;
+    } finally {
+      if (current === areaRequest) set({ areasBusy: false });
+    }
+  },
+  /// Everything the dashboard shows: local Git, the GitHub store, the progress plan, then its own
+  /// reads. The plan's issues are read once the plan is.
   refreshAll: async () => {
     if (useGit.getState().detection.status === 'found')
       void gitActions.refresh();
     if (connected()) void githubActions.refresh();
+    void progressActions.load().then(() => actions.refreshAreas());
     return actions.refresh();
   },
   /// Shown over open tabs. Only one thing occupies the editor area, so a diff or patch is closed.
@@ -129,6 +194,7 @@ export const actions = {
 useWorkspace.subscribe((state, previous) => {
   if (state.workspace?.id !== previous.workspace?.id) {
     request++;
+    areaRequest++;
     set({ ...initial });
     return;
   }
@@ -148,6 +214,7 @@ useGitHub.subscribe((state, previous) => {
     previous.account.status === 'signedIn'
   ) {
     request++;
-    set({ ...remote, busy: false });
+    areaRequest++;
+    set({ ...remote, areasBusy: false, busy: false });
   }
 });

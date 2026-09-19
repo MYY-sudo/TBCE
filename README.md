@@ -2,7 +2,7 @@
 
 **Everything your project needs, in one place.**
 
-TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 11: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, GitHub issues, a read-only pull request viewer, and a project dashboard. Desktop acceptance for the terminal, project system, stacks, architectures, Git, GitHub, and the dashboard remains pending; see the verification record.
+TBCE means Tools, Branches, Code, Everything. This Windows-first desktop application implements Milestones 0 to 12: a Tauri/Rust foundation, a React/TypeScript workspace powered by Monaco, an integrated terminal, the project system, personal saved stacks, personal architectures, the local Git backend, the source-control panel over it, GitHub repository context, GitHub issues, a read-only pull request viewer, a project dashboard, and project progress. Desktop acceptance for the terminal, project system, stacks, architectures, Git, GitHub, the dashboard and progress remains pending; see the verification record.
 
 ## Available now
 
@@ -27,8 +27,9 @@ TBCE means Tools, Branches, Code, Everything. This Windows-first desktop applica
 - List open and closed issues with their labels, assignees and milestone, filter them by label, assignee and milestone, read an issue's body, and create, close or reopen an issue.
 - List open and closed pull requests, and read one: source and target branch, description, reviewers, counts, whether it merges cleanly, the state of its checks and commit statuses, and its changed files, each of which opens as a read-only patch in the editor area.
 - See the whole project on one dashboard: repository, Git state, branch, the CI state of the commit you have checked out, open issue and pull request counts, commands, GitHub milestones, recent commits and recent activity.
+- Track progress by area: divide the project into areas, tick off each area's tasks, and count the GitHub issues carrying its label or in its milestone. Commits are never counted.
 
-Creating, reviewing and merging pull requests, project progress, running project commands, and the rest of V1 remain for later milestones.
+Creating, reviewing and merging pull requests, running project commands, and the rest of V1 remain for later milestones.
 
 ## Projects
 
@@ -125,7 +126,7 @@ in this release.
 Which repository you are looking at comes from your own Git remote — the one your branch
 tracks, or the only one, or `origin` — so there is nothing to configure. A remote pointing
 anywhere other than github.com is explained rather than attempted. Every request is built
-in Rust from a workspace identifier and a page number; the interface cannot name a host, a
+in Rust from a workspace identifier, a page number and values checked first; the interface cannot name a host, a
 path or a URL, and the application still allows no remote origin in the webview at all,
 which is why you see your login name rather than an avatar.
 
@@ -164,8 +165,33 @@ so rather than reading as a failure. The links on the Git state, Issues and Pull
 the matching panel beside the dashboard.
 
 Like the panels, it reads only while it is on screen: when it appears, when the window regains focus
-and when you press Refresh. Commands are shown and not run yet, and project progress arrives in a
-later milestone; both cards say so.
+and when you press Refresh. Commands are shown and not run yet, and the card says so. Project
+progress has a card of its own, described next.
+
+## Progress
+
+The **Project progress** card on the dashboard divides the project into areas, such as
+Authentication or Teams. Choose **Add areas** or **Edit areas** to name them, list each area's
+tasks, and optionally give an area a GitHub label, a GitHub milestone or both. Open an area on the
+card to tick its tasks; each tick is saved at once.
+
+An area's figure is its done tasks and closed issues over all its tasks and issues. Its issues are
+the ones carrying its label and the ones in its milestone, each counted once, with pull requests
+left out. An issue closed as not planned counts neither way, and the card says how many were left
+out. An area with nothing to measure shows no percentage rather than 0%. The project's figure adds
+the areas together and counts an issue shared by two areas once. Commits are never counted.
+
+The plan is kept in `.tbce/progress.json`, next to `project.json`, so it travels with the
+repository; `project.json` itself is not changed. Progress needs a TBCE project, and a plain folder
+is offered conversion first. If the file changes on disk while TBCE has it open, a change is
+refused rather than written over the other one, and the card shows what is on disk. A file TBCE
+cannot read is explained and never overwritten.
+
+Issues are read only with a GitHub account connected and a github.com remote, and only when the
+dashboard appears, when the areas' labels or milestones change, when the window regains focus, and
+on Refresh; ticking a task asks GitHub nothing. Up to five hundred issues and pull requests are read per label or milestone,
+and an area that reaches that says so. Signed out, or without a GitHub remote, an area counts its
+tasks alone and says why.
 
 ## Development
 
@@ -195,7 +221,7 @@ Use `npm run format` and `cargo fmt --manifest-path src-tauri/Cargo.toml` to for
 
 The unsigned Windows installer is generated at `src-tauri/target/release/bundle/nsis/TBCE_0.1.0_x64-setup.exe`. A standalone executable is generated at `src-tauri/target/release/tbce.exe`. The installer uses a per-user installation; no signing or public release pipeline is configured.
 
-The Milestone 6 build used `npm run tauri build -- --target x86_64-pc-windows-msvc` because the standard release executable was running. Its executable and installer are under `src-tauri/target/x86_64-pc-windows-msvc/release/` and `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`. See the verification record for desktop acceptance limits.
+The Milestone 6 build used `npm run tauri build -- --target x86_64-pc-windows-msvc` because the standard release executable was running. Its executable and installer are under `src-tauri/target/x86_64-pc-windows-msvc/release/` and `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`. The Milestone 12 build used the standard command, so its installer is at the standard path above. See the verification record for desktop acceptance limits.
 
 ## Keyboard shortcuts
 
@@ -226,9 +252,10 @@ Rust confines editing and snapshot source reads to the selected workspace, saved
 - [Milestone 9 delivery checklist](docs/milestone-9.md)
 - [Milestone 10 delivery checklist](docs/milestone-10.md)
 - [Milestone 11 delivery checklist](docs/milestone-11.md)
+- [Milestone 12 delivery checklist](docs/milestone-12.md)
 - [Architecture and native interfaces](docs/architecture.md)
 - [Windows acceptance checklist](docs/acceptance.md)
-- [Manual acceptance run-sheet for checks 15-42, 57-66 and 67-98](docs/acceptance-runsheet-m6.md)
+- [Manual acceptance run-sheet for checks 15-42, 57-66 and 67-106](docs/acceptance-runsheet-m6.md)
 - [Verification results](docs/verification.md)
 - [Remaining work](docs/remaining-work.md)
 

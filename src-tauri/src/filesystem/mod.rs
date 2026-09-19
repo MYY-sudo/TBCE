@@ -178,7 +178,7 @@ fn bytes(path: &Path) -> Result<Vec<u8>> {
     }
     Ok(result)
 }
-fn revision(data: &[u8]) -> String {
+pub(crate) fn revision(data: &[u8]) -> String {
     format!("{:x}", Sha256::digest(data))
 }
 

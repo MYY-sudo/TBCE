@@ -3,12 +3,16 @@ import { actions, useDashboard } from '../src/stores/dashboard';
 import { useGitHub } from '../src/stores/github';
 import { useGit } from '../src/stores/git';
 import { useWorkspace } from '../src/stores/workspace';
+import { useProgress } from '../src/stores/progress';
 import { github } from '../src/services/github';
+import { progress } from '../src/services/progress';
 import { git } from '../src/services/git';
 import { fileSystem } from '../src/services/filesystem';
 import { milestoneProgress } from '../src/types/github';
+import type { ProgressPlan } from '../src/types/progress';
 import type {
   GitHubAccount,
+  GitHubAreaIssues,
   GitHubCounts,
   GitHubHeadChecks,
   GitHubMilestone,
@@ -26,7 +30,11 @@ vi.mock('../src/services/github', () => ({
     counts: vi.fn(),
     milestones: vi.fn(),
     headChecks: vi.fn(),
+    areaIssues: vi.fn(),
   },
+}));
+vi.mock('../src/services/progress', () => ({
+  progress: { read: vi.fn(), write: vi.fn() },
 }));
 vi.mock('../src/services/git', () => ({
   git: {
@@ -78,6 +86,27 @@ const head: GitHubHeadChecks = {
   rate: null,
 };
 const empty = { items: [], page: 1, hasMore: false, rate: null };
+const area = (id: string, label: string | null, milestone: number | null) => ({
+  id,
+  name: `Area ${id}`,
+  label,
+  milestone,
+  tasks: [],
+});
+/// Two areas share a mapping, one has none, and one is mapped by milestone alone.
+const plan: ProgressPlan = {
+  areas: [
+    area('a', 'area:auth', null),
+    area('b', ' area:auth ', null),
+    area('c', null, null),
+    area('d', null, 4),
+  ],
+};
+const issues: GitHubAreaIssues = {
+  issues: [{ number: 1, title: 'Login', state: 'closed', notPlanned: false }],
+  truncated: false,
+  rate: null,
+};
 const tab = {
   id: 'tab-1',
   path: 'src/app.ts',
@@ -93,7 +122,10 @@ beforeEach(() => {
   useGitHub.setState(useGitHub.getInitialState(), true);
   useGit.setState(useGit.getInitialState(), true);
   useWorkspace.setState(useWorkspace.getInitialState(), true);
+  useProgress.setState(useProgress.getInitialState(), true);
   vi.mocked(fileSystem.list).mockResolvedValue([]);
+  vi.mocked(progress.read).mockResolvedValue({ status: 'none' });
+  vi.mocked(github.areaIssues).mockResolvedValue(issues);
   vi.mocked(git.detect).mockResolvedValue({ status: 'none' });
   vi.mocked(github.link).mockResolvedValue({ status: 'noRepository' });
   vi.mocked(github.counts).mockResolvedValue(counts);
@@ -205,12 +237,122 @@ test('an answer for a replaced folder is discarded', async () => {
   expect(github.headChecks).not.toHaveBeenCalled();
 });
 
+/// The plan the progress store would have read from `.tbce/progress.json`.
+const planned = () =>
+  useProgress.setState({
+    detection: { status: 'found', plan, revision: 'r1' },
+    loaded: true,
+  });
+
+test('each distinct mapping is read once, and an area with none sends nothing', async () => {
+  await connect();
+  planned();
+
+  expect(await actions.refreshAreas()).toBe(true);
+
+  expect(vi.mocked(github.areaIssues).mock.calls).toEqual([
+    ['1', 'area:auth', null],
+    ['1', null, 4],
+  ]);
+  const areas = useDashboard.getState().areas;
+  expect(Object.keys(areas)).toEqual(['area:auth#', '#4']);
+  expect(areas['area:auth#']).toEqual({
+    value: issues,
+    denied: false,
+    error: null,
+  });
+  expect(useDashboard.getState().areasBusy).toBe(false);
+});
+
+test('signed out, no area issues are asked for', async () => {
+  useWorkspace.setState({ workspace });
+  planned();
+
+  expect(await actions.refreshAreas()).toBe(false);
+
+  expect(github.areaIssues).not.toHaveBeenCalled();
+  expect(useDashboard.getState().areas).toEqual({});
+});
+
+test('a refused area keeps its refusal and the other areas are still read', async () => {
+  await connect();
+  planned();
+  vi.mocked(github.areaIssues)
+    .mockRejectedValueOnce({ code: 'GITHUB_FORBIDDEN', message: 'refused' })
+    .mockResolvedValueOnce(issues);
+
+  expect(await actions.refreshAreas()).toBe(true);
+
+  const areas = useDashboard.getState().areas;
+  expect(areas['area:auth#']).toEqual({
+    value: null,
+    denied: true,
+    error: null,
+  });
+  expect(areas['#4'].value).toEqual(issues);
+});
+
+test('a rejected token during an area read stops the rest and reloads the account', async () => {
+  await connect();
+  planned();
+  vi.mocked(github.areaIssues).mockRejectedValue({
+    code: 'GITHUB_AUTH_FAILED',
+    message: 'GitHub rejected the stored token.',
+  });
+  vi.mocked(github.account).mockResolvedValue({ status: 'signedOut' });
+
+  expect(await actions.refreshAreas()).toBe(false);
+
+  expect(github.areaIssues).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() =>
+    expect(useGitHub.getState().account.status).toBe('signedOut'),
+  );
+  expect(useDashboard.getState().areas).toEqual({});
+});
+
+test('an area answer for a replaced folder is discarded', async () => {
+  await connect();
+  planned();
+  let answer: (value: GitHubAreaIssues) => void = () => {};
+  vi.mocked(github.areaIssues).mockReturnValue(
+    new Promise((resolve) => (answer = resolve)),
+  );
+
+  const pending = actions.refreshAreas();
+  useWorkspace.setState({
+    workspace: { id: '2', name: 'other', path: 'C:/code/other' },
+  });
+  answer(issues);
+
+  expect(await pending).toBe(false);
+  expect(useDashboard.getState().areas).toEqual({});
+  expect(github.areaIssues).toHaveBeenCalledTimes(1);
+});
+
+test('refreshing everything reads the plan and then its areas', async () => {
+  await connect();
+  vi.mocked(progress.read).mockResolvedValue({
+    status: 'found',
+    plan,
+    revision: 'r1',
+  });
+
+  await actions.refreshAll();
+
+  await vi.waitFor(() => expect(github.areaIssues).toHaveBeenCalledTimes(2));
+  expect(progress.read).toHaveBeenCalledWith('1');
+  await vi.waitFor(() =>
+    expect(Object.keys(useDashboard.getState().areas)).toHaveLength(2),
+  );
+});
+
 test('signing out clears what was read with the account', async () => {
   await connect();
   await actions.refresh();
 
   useGitHub.setState({ account: { status: 'signedOut' } });
 
+  expect(useDashboard.getState().areas).toEqual({});
   expect(useDashboard.getState().counts).toBeNull();
   expect(useDashboard.getState().head).toBeNull();
 });

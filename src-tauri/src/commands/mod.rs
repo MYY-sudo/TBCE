@@ -2,6 +2,7 @@ use crate::architecture::{Architecture, ArchitectureFields, ArchitectureService,
 use crate::filesystem::{Document, Entry, FileSystemService, Result, ServiceError, Workspace};
 use crate::git::{self, GitService};
 use crate::github::{self, GitHubService};
+use crate::progress::{Progress, ProgressDetection, ProgressPlan, ProgressService};
 use crate::project::{Project, ProjectDetection, ProjectFields, ProjectService};
 use crate::templates::{Catalog, SourceEntry, Stack, StackFields, TemplateService};
 use crate::terminal::{Terminal, TerminalEvent, TerminalService};
@@ -607,6 +608,21 @@ pub async fn github_head_checks(
     })
     .await
 }
+/// The issues of one progress area. The label and milestone come from the plan the webview holds,
+/// and are checked before any request exists; the repository still comes from the Git remote.
+#[tauri::command]
+pub async fn github_area_issues(
+    app: AppHandle,
+    workspace_id: String,
+    label: Option<String>,
+    milestone: Option<u64>,
+) -> Result<github::AreaIssues> {
+    let (owner, repo) = linked(&app, workspace_id).await?;
+    github_task(app, move |service| {
+        service.area_issues(&owner, &repo, label.as_deref(), milestone)
+    })
+    .await
+}
 /// The commit HEAD points at, or nothing on a branch with no commits yet.
 fn head_commit(root: &Path) -> Option<String> {
     match GitService::detect(root) {
@@ -809,6 +825,26 @@ pub async fn update_project(
 ) -> Result<Project> {
     let root = lock(&state)?.root_path(&workspace_id)?;
     ProjectService::update(&root, fields)
+}
+#[tauri::command]
+pub async fn read_progress(
+    state: State<'_, Backend>,
+    workspace_id: String,
+) -> Result<ProgressDetection> {
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    ProgressService::read(&root)
+}
+/// `revision` is the one the interface read, or nothing when there was no file, so a plan changed
+/// on disk in the meantime is refused rather than overwritten.
+#[tauri::command]
+pub async fn write_progress(
+    state: State<'_, Backend>,
+    workspace_id: String,
+    plan: ProgressPlan,
+    revision: Option<String>,
+) -> Result<Progress> {
+    let root = lock(&state)?.root_path(&workspace_id)?;
+    ProgressService::write(&root, plan, revision.as_deref())
 }
 #[tauri::command]
 pub async fn open_recent_project(state: State<'_, Backend>, path: String) -> Result<Workspace> {

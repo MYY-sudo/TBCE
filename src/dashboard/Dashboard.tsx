@@ -18,6 +18,7 @@ import {
 import { actions, useDashboard } from '../stores/dashboard';
 import { OutcomeIcon } from '../github/PullRequestsTab';
 import { RecentProjects } from '../components/RecentProjects';
+import { ProgressCard } from './ProgressCard';
 import { headLabel } from '../types/git';
 import {
   checksLabel,
@@ -502,11 +503,16 @@ export default function Dashboard({
             ),
           )}
         </Card>
-        <Card title="Project progress">
-          <p className="muted github-empty">
-            Progress from issues, milestones and explicit tasks arrives with
-            Milestone 12. Commit counts are deliberately not used.
-          </p>
+        <Card title="Project progress" wide>
+          <ProgressCard
+            unavailable={
+              !found
+                ? 'no GitHub remote'
+                : !signedIn
+                  ? 'connect a GitHub account'
+                  : null
+            }
+          />
         </Card>
         <Card
           title="Recent commits"

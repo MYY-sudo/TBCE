@@ -1586,6 +1586,110 @@ kbd {
   height: 100%;
   background: #8faf7e;
 }
+/* Project progress: areas with bars that open onto their tasks and issues. */
+.progress-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px 16px;
+  margin-top: 6px;
+}
+.progress-area {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.progress-area > .github-meta {
+  margin: 0;
+  padding: 0 4px;
+}
+.progress-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 1px 2px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.progress-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 2px 14px;
+}
+.progress-detail .github-meta {
+  margin: 0;
+}
+.progress-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 4px;
+  font-size: 12px;
+  color: #d3d9df;
+  overflow-wrap: anywhere;
+}
+.progress-task input {
+  margin-top: 2px;
+}
+.progress-modal {
+  width: 640px;
+}
+.progress-modal select,
+.progress-modal input[type='number'] {
+  width: 100%;
+  background: #171b20;
+  border: 1px solid #45503e;
+  padding: 10px;
+  border-radius: 5px;
+  color: #e1e8df;
+}
+.progress-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 52vh;
+  overflow: auto;
+  margin: 14px 0 8px;
+  padding-right: 4px;
+}
+.progress-edit-area {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #333a42;
+  border-radius: 7px;
+  min-width: 0;
+}
+.progress-edit-area .field-grid {
+  margin-top: 10px;
+}
+.progress-edit-area .field-legend {
+  margin: 12px 0 6px;
+}
+.progress-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.progress-edit-row input:not([type='checkbox']) {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+}
+.progress-edit-row input[type='checkbox'] {
+  width: auto;
+}
+.progress-edit-row button {
+  flex-shrink: 0;
+  padding: 6px;
+  border: 1px solid #424952;
+}
+.progress-edit-row .danger {
+  color: #edb1ab;
+}
 .dashboard-recent {
   max-width: 520px;
 }
@@ -1598,6 +1702,9 @@ kbd {
 @media (max-width: 900px) {
   .dashboard {
     padding: 18px 16px 26px;
+  }
+  .progress-modal .field-grid {
+    grid-template-columns: 1fr;
   }
 }
 

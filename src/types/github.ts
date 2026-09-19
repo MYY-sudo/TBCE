@@ -361,6 +361,21 @@ export interface GitHubHeadChecks {
   checks: GitHubChecks | null;
   rate: GitHubRateLimit | null;
 }
+/// An issue that belongs to a progress area. Pull requests are left out before it gets here.
+export interface GitHubAreaIssue {
+  number: number;
+  title: string;
+  state: GitHubIssueState;
+  /// Closed as not planned, which progress leaves out rather than counting as done.
+  notPlanned: boolean;
+}
+/// The issues carrying an area's label and those in its milestone, each once.
+export interface GitHubAreaIssues {
+  issues: GitHubAreaIssue[];
+  /// GitHub had more than the five hundred read for the label or the milestone.
+  truncated: boolean;
+  rate: GitHubRateLimit | null;
+}
 /// How much of a milestone is closed, from 0 to 1, or null when nothing is assigned to it.
 export const milestoneProgress = (
   milestone: GitHubMilestone,

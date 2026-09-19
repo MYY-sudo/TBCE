@@ -3,7 +3,8 @@
 //! The webview never names a host, a path or a header: commands carry a workspace identifier, a
 //! page number and checked values, and this module builds every request. Only issues are ever
 //! written, from `issues`, and only on an explicit action; pull requests, from `pulls`, and the
-//! dashboard's counts, milestones and head checks, from `overview`, are only ever read. Repository
+//! dashboard's counts, milestones and head checks, from `overview`, and the issues mapped into
+//! the project's progress areas, from `progress`, are only ever read. Repository
 //! identity is read from the workspace's own Git remote rather than supplied
 //! by the interface, and the access token lives in the operating system credential vault, is read
 //! per operation, and is never returned.
@@ -19,12 +20,14 @@ mod issues;
 #[cfg(test)]
 mod mock;
 mod overview;
+mod progress;
 mod pulls;
 
 pub use issues::{
     CloseReason, Issue, IssueChoices, IssueCreated, IssueDetail, IssueDraft, IssueFilter,
 };
 pub use overview::{Counts, HeadChecks, Milestone};
+pub use progress::AreaIssues;
 pub use pulls::{PullFile, PullRequest, PullRequestDetail, PullState};
 
 const API: &str = "https://api.github.com";
@@ -1554,7 +1557,13 @@ mod tests {
 
     #[test]
     fn nothing_in_this_module_prints() {
-        for source in [include_str!("mod.rs"), include_str!("issues.rs")] {
+        for source in [
+            include_str!("mod.rs"),
+            include_str!("issues.rs"),
+            include_str!("overview.rs"),
+            include_str!("progress.rs"),
+            include_str!("pulls.rs"),
+        ] {
             let code = source
                 .split("#[cfg(test)]")
                 .next()

@@ -6,7 +6,9 @@ import { useGitHub } from '../src/stores/github';
 import { useGit } from '../src/stores/git';
 import { useProject } from '../src/stores/project';
 import { useWorkspace } from '../src/stores/workspace';
+import { useProgress } from '../src/stores/progress';
 import { github } from '../src/services/github';
+import { progress } from '../src/services/progress';
 import { git } from '../src/services/git';
 import { projects } from '../src/services/project';
 import { fileSystem } from '../src/services/filesystem';
@@ -29,7 +31,12 @@ vi.mock('../src/services/github', () => ({
     counts: vi.fn(),
     milestones: vi.fn(),
     headChecks: vi.fn(),
+    areaIssues: vi.fn(),
+    issueChoices: vi.fn(),
   },
+}));
+vi.mock('../src/services/progress', () => ({
+  progress: { read: vi.fn(), write: vi.fn() },
 }));
 vi.mock('../src/services/git', () => ({
   git: {
@@ -116,7 +123,42 @@ beforeEach(() => {
   useGit.setState(useGit.getInitialState(), true);
   useProject.setState({ ...useProject.getInitialState(), recent: [] }, true);
   useWorkspace.setState(useWorkspace.getInitialState(), true);
+  useProgress.setState(useProgress.getInitialState(), true);
   vi.mocked(fileSystem.list).mockResolvedValue([]);
+  vi.mocked(progress.read).mockResolvedValue({
+    status: 'found',
+    revision: 'r1',
+    plan: {
+      areas: [
+        {
+          id: 'a1',
+          name: 'Authentication',
+          label: 'area:auth',
+          milestone: 2,
+          tasks: [
+            { id: 't1', title: 'Login', done: true },
+            { id: 't2', title: 'Register', done: false },
+          ],
+        },
+        {
+          id: 'a2',
+          name: 'Teams',
+          label: null,
+          milestone: null,
+          tasks: [{ id: 't3', title: 'Invitations', done: false }],
+        },
+      ],
+    },
+  });
+  vi.mocked(github.areaIssues).mockResolvedValue({
+    issues: [
+      { number: 5, title: 'OAuth', state: 'closed', notPlanned: false },
+      { number: 6, title: 'SSO', state: 'open', notPlanned: false },
+      { number: 7, title: 'LDAP', state: 'closed', notPlanned: true },
+    ],
+    truncated: false,
+    rate: null,
+  });
   vi.mocked(projects.detect).mockResolvedValue({
     status: 'found',
     path: 'C:/code/app/.tbce/project.json',
@@ -275,9 +317,26 @@ test('every card reports the project it was read from', async () => {
     }),
   ).toHaveAttribute('aria-valuenow', '75');
   expect(within(card('Milestones')).getByText(/thirty shown/)).toBeVisible();
+  const progressCard = card('Project progress');
+  // Authentication: one of two tasks and one of two issues, with the issue closed as not planned
+  // left out. Teams: none of one task. Five items, two done.
   expect(
-    within(card('Project progress')).getByText(/Milestone 12/),
+    await within(progressCard).findByText(/1 of 2 tasks · 1 of 2 issues/),
   ).toBeVisible();
+  expect(
+    within(progressCard).getByText(/1 not planned, left out/),
+  ).toBeVisible();
+  expect(
+    within(progressCard).getByRole('progressbar', {
+      name: 'Authentication progress',
+    }),
+  ).toHaveAttribute('aria-valuenow', '50');
+  expect(
+    within(progressCard).getByRole('progressbar', { name: 'Project progress' }),
+  ).toHaveAttribute('aria-valuenow', '40');
+  expect(within(progressCard).getByText('2 of 5 done')).toBeVisible();
+  expect(github.areaIssues).toHaveBeenCalledWith('1', 'area:auth', 2);
+  expect(github.areaIssues).toHaveBeenCalledTimes(1);
   expect(
     await within(card('Recent commits')).findByText('Giriş ekranı eklendi'),
   ).toBeVisible();
@@ -316,6 +375,13 @@ test('signed out, only local cards are read and the GitHub cards say how to conn
   expect(github.counts).not.toHaveBeenCalled();
   expect(github.headChecks).not.toHaveBeenCalled();
   expect(github.repository).not.toHaveBeenCalled();
+  // Progress still counts tasks, and says why the mapped issues are not in it.
+  expect(
+    await within(card('Project progress')).findByText(
+      /1 of 2 tasks · issues not counted: connect a GitHub account/,
+    ),
+  ).toBeVisible();
+  expect(github.areaIssues).not.toHaveBeenCalled();
 });
 
 test('a folder that is not a repository says so and asks GitHub nothing about it', async () => {

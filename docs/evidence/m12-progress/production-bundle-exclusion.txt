@@ -1,0 +1,85 @@
+Milestone 12 - Project progress: production bundle inspection
+Date: 2026-09-19
+Build: npm run tauri build
+Bundle: dist/ as produced by that build (Vite 7, production mode)
+
+Milestones 6 to 11 checked that the development-only Git harness does not ship,
+that the webview names no GitHub host, that the webview sends no write method,
+and that no component sets inner HTML. All four are rechecked. The progress card
+shows area names and task titles typed by whoever edited progress.json, and issue
+titles written by other people, so the inner-HTML check matters here too.
+
+$ grep -rl "tbce-git-harness-dev-only" dist/
+(no matches)
+
+$ grep -rl "api.github.com" dist/
+(no matches)
+
+The API host still appears nowhere in the bundle. Commands are named, never an
+endpoint. The one GitHub read and the two progress commands this milestone added
+are among them:
+
+$ grep -oh "github_[a-z_]*\|read_progress\|write_progress" dist/assets/index-*.js dist/assets/Dashboard-*.js | sort -u
+github_account
+github_activity
+github_area_issues
+github_branches
+github_close_issue
+github_commits
+github_counts
+github_create_issue
+github_head_checks
+github_issue
+github_issue_choices
+github_issues
+github_link
+github_milestones
+github_pull_files
+github_pull_request
+github_pull_requests
+github_reopen_issue
+github_repository
+github_sign_in
+github_sign_out
+read_progress
+write_progress
+
+$ grep -rlE "\"(POST|PATCH)\"" dist/assets/
+(no matches)
+
+$ grep -rln "dangerouslySetInnerHTML\|innerHTML" src/
+(no matches)
+
+$ grep -c "dangerouslySetInnerHTML" dist/assets/index-*.js
+1
+
+React's own runtime names the property, which is why the bundle count is not
+zero; no TBCE source file uses it or innerHTML, which is the claim that
+matters.
+
+$ ls dist/assets | grep -iE "harness|github|issue|pull|patch|diff|dashboard|progress"
+Dashboard-DjuwkL9D.js
+DiffView-D6viTjEi.js
+PatchView-DoHgSLkm.js
+PullFileView-Co9b2ODe.js
+
+$ for p in read_progress github_area_issues "Edit areas" "ProgressCard\|progress-areas"; do ...; done
+read_progress: index-SjNwKHtX.js
+github_area_issues: index-SjNwKHtX.js
+Edit areas: Dashboard-DjuwkL9D.js
+ProgressCard\|progress-areas: Dashboard-DjuwkL9D.js
+
+The progress card and the Edit areas dialog ship inside the dashboard's lazy
+chunk, loaded the first time the dashboard is shown; there is no chunk of their
+own. The progress store and its adapter ship in the main entry chunk, because
+the dashboard store, which the application shell uses for its focus refresh,
+imports them. The other lazy chunks are unchanged: Editor and TerminalPanel.
+
+$ git diff HEAD --stat -- src-tauri/tauri.conf.json
+(no output)
+
+$ grep -o "connect-src[^\"]*" src-tauri/tauri.conf.json
+connect-src ipc: http://ipc.localhost; worker-src 'self' blob:
+
+The content security policy is unchanged by this milestone. The webview can
+make no request of its own and load no remote image.
